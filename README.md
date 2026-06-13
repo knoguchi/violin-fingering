@@ -18,6 +18,16 @@ constraints.
 Repository: https://github.com/knoguchi/violin-fingering
 Bug reports and feature requests: https://github.com/knoguchi/violin-fingering/issues
 
+## Before / after
+
+Original:
+
+![Original score](docs/images/original.png)
+
+Annotated by the plugin:
+
+![Annotated score](docs/images/annotated.png)
+
 ## Setup
 1. Copy this folder to `Documents/MuseScore4/Plugins/` and restart MuseScore.
 2. Enable the plugin in Home > Plugins.

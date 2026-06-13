@@ -17,7 +17,7 @@ import "violin_fingering_core.js" as Core
 
 MuseScore {
     id: plugin
-    version: "1.4"
+    version: "1.0"
     title: "ViolinFingering"
     description: "Violin fingering (string/finger/position) by dynamic programming. Reads key signature; writes finger numbers and Roman-numeral position marks."
     categoryCode: "composing-arranging-tools"
@@ -398,7 +398,7 @@ MuseScore {
             TextEdit {
                 id: statusText
                 width: parent.width
-                text: "v1.4 - Run computes violin fingering and writes annotations. Chord events are solved as joint hand frames. Use Copy log to share results. Issues: github.com/knoguchi/violin-fingering"
+                text: "v1.0 - Run computes violin fingering and writes annotations. Chord events are solved as joint hand frames. Use Copy log to share results. Issues: github.com/knoguchi/violin-fingering"
                 wrapMode: TextEdit.Wrap
                 readOnly: true
                 selectByMouse: true
