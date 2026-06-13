@@ -134,7 +134,7 @@ function solve(events, key, maxPosition) {
 
 // --- chord-aware (multi-note per event) ---------------
 
-var CHORD_POS_SPAN = 2;
+var CHORD_POS_SPAN = 1;
 
 function candidatesForEvent(notes, key, maxPosition) {
     if (maxPosition === undefined) maxPosition = 7;
@@ -191,21 +191,23 @@ function candidatesForEvent(notes, key, maxPosition) {
 
 function chordLocalCost(combo, pos) {
     var c = 0.0;
-    var fingered = [];
+    var positions = [];
     for (var i = 0; i < combo.length; i++) {
-        var k = combo[i][1], off = combo[i][3];
+        var k = combo[i][1], p = combo[i][2], off = combo[i][3];
         if (k === 0) c += W_OPEN_BONUS;
         if (off !== 0) c += W_ACCIDENTAL;
-        if (k > 0) fingered.push(k);
+        if (k > 0) positions.push(p);
     }
     c += W_LOW_POS * (pos - 1);
-    if (fingered.length >= 2) {
-        var mn = fingered[0], mx = fingered[0];
-        for (var f = 1; f < fingered.length; f++) {
-            if (fingered[f] < mn) mn = fingered[f];
-            if (fingered[f] > mx) mx = fingered[f];
+    // Penalize position span across fingered strings (hand shape contortion).
+    // Different fingers per se are not a cost; only the position spread is.
+    if (positions.length >= 2) {
+        var mn = positions[0], mx = positions[0];
+        for (var z = 1; z < positions.length; z++) {
+            if (positions[z] < mn) mn = positions[z];
+            if (positions[z] > mx) mx = positions[z];
         }
-        c += 0.2 * (mx - mn);
+        c += 0.5 * (mx - mn);
     }
     return c;
 }
