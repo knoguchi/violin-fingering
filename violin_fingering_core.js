@@ -67,11 +67,24 @@ function candidatesForPitch(pitch, key, maxPosition) {
 // Cost weights
 var W_POS_SHIFT = 3.0;
 var W_POS_FIXED = 2.5;
-var W_STRING_MOVE = 1.0;
+// Bow crossing by string distance: staying, adjacent, skip one, skip two.
+// Adjacent crossings are nearly free; skipping over strings is a real
+// bow maneuver and must cost more than linearly.
+var W_CROSS = [0.0, 0.5, 2.5, 5.0];
 var W_FINGER_MOVE = 0.1;
+// Same finger jumping to another string must lift and replace (gap/smear
+// risk), comparable to a small shift. Exception: a perfect fifth on
+// adjacent strings is a one-finger barre.
+var W_SAME_FINGER_CROSS = 1.5;
+var W_BARRE = 0.2;
 var W_OPEN_BONUS = -0.2;
-var W_ACCIDENTAL = 0.3;
+// Displacing a finger from its key frame. True accidentals pay this on
+// every candidate equally; it mainly discourages a displaced finger when
+// the in-frame finger for the same pitch is available.
+var W_ACCIDENTAL = 0.6;
 var W_LOW_POS = 0.05;
+// Shifting while an open string sounds hides the slide.
+var OPEN_SHIFT_DISCOUNT = 0.5;
 
 function transitionCost(prev, cur) {
     var s1 = prev[0], k1 = prev[1], p1 = prev[2];
@@ -80,7 +93,13 @@ function transitionCost(prev, cur) {
     var ep2 = k2 > 0 ? p2 : p1;
     var c = 0.0;
     if (ep1 !== ep2) c += W_POS_FIXED + W_POS_SHIFT * Math.abs(ep1 - ep2);
-    if (s1 !== s2) c += W_STRING_MOVE * Math.abs(s1 - s2);
+    if (s1 !== s2) {
+        c += W_CROSS[Math.min(Math.abs(s1 - s2), 3)];
+        if (k1 > 0 && k1 === k2) {
+            var barre = Math.abs(s1 - s2) === 1 && p1 === p2 && prev[3] === cur[3];
+            c += barre ? W_BARRE : W_SAME_FINGER_CROSS;
+        }
+    }
     else if (k1 !== k2 && k1 > 0 && k2 > 0) c += W_FINGER_MOVE;
     return c;
 }
@@ -155,13 +174,18 @@ function candidatesForEvent(notes, key, maxPosition) {
     var out = [];
     function recurse(idx, picked, usedStrings, fingeredPositions) {
         if (idx === notes.length) {
-            var pos = 1;
             if (fingeredPositions.length) {
-                pos = fingeredPositions[0];
+                var pos = fingeredPositions[0];
                 for (var z = 1; z < fingeredPositions.length; z++)
                     if (fingeredPositions[z] < pos) pos = fingeredPositions[z];
+                out.push({combo: picked.slice(), pos: pos, openOnly: false});
+            } else {
+                // All open strings: the hand does not have to move. Emit
+                // one candidate per position so the Viterbi carries the
+                // hand position through instead of snapping to I.
+                for (var q = 1; q <= maxPosition; q++)
+                    out.push({combo: picked.slice(), pos: q, openOnly: true});
             }
-            out.push({combo: picked.slice(), pos: pos});
             return;
         }
         for (var i = 0; i < perNote[idx].length; i++) {
@@ -189,7 +213,8 @@ function candidatesForEvent(notes, key, maxPosition) {
     return out;
 }
 
-function chordLocalCost(combo, pos) {
+function chordLocalCost(entry) {
+    var combo = entry.combo;
     var c = 0.0;
     var positions = [];
     for (var i = 0; i < combo.length; i++) {
@@ -198,7 +223,8 @@ function chordLocalCost(combo, pos) {
         if (off !== 0) c += W_ACCIDENTAL;
         if (k > 0) positions.push(p);
     }
-    c += W_LOW_POS * (pos - 1);
+    // Open-only events have no real hand placement; their pos is virtual.
+    if (!entry.openOnly) c += W_LOW_POS * (entry.pos - 1);
     // Penalize position span across fingered strings (hand shape contortion).
     // Different fingers per se are not a cost; only the position spread is.
     if (positions.length >= 2) {
@@ -212,9 +238,38 @@ function chordLocalCost(combo, pos) {
     return c;
 }
 
-function chordTransCost(prevPos, curPos) {
-    if (prevPos !== curPos) return W_POS_FIXED + W_POS_SHIFT * Math.abs(prevPos - curPos);
-    return 0.0;
+function chordTransCost(prev, cur) {
+    var c = 0.0;
+    if (prev.pos !== cur.pos) {
+        var shift = W_POS_FIXED + W_POS_SHIFT * Math.abs(prev.pos - cur.pos);
+        if (prev.openOnly || cur.openOnly) shift *= OPEN_SHIFT_DISCOUNT;
+        c += shift;
+    }
+    // Bow crossing: gap between the string ranges of the two events.
+    var mn1 = 4, mx1 = -1, mn2 = 4, mx2 = -1;
+    for (var i = 0; i < prev.combo.length; i++) {
+        var s1 = prev.combo[i][0];
+        if (s1 < mn1) mn1 = s1;
+        if (s1 > mx1) mx1 = s1;
+    }
+    for (var j = 0; j < cur.combo.length; j++) {
+        var s2 = cur.combo[j][0];
+        if (s2 < mn2) mn2 = s2;
+        if (s2 > mx2) mx2 = s2;
+    }
+    var gap = Math.max(0, mn2 - mx1, mn1 - mx2);
+    c += W_CROSS[Math.min(gap, 3)];
+    // Melodic finger continuity (single-note events only).
+    if (prev.combo.length === 1 && cur.combo.length === 1) {
+        var a = prev.combo[0], b = cur.combo[0];
+        if (a[1] > 0 && a[1] === b[1] && a[0] !== b[0]) {
+            var barre = Math.abs(a[0] - b[0]) === 1 && a[2] === b[2] && a[3] === b[3];
+            c += barre ? W_BARRE : W_SAME_FINGER_CROSS;
+        } else if (a[0] === b[0] && a[1] > 0 && b[1] > 0 && a[1] !== b[1]) {
+            c += W_FINGER_MOVE;
+        }
+    }
+    return c;
 }
 
 // Solve chord events. Each event = {pitches: [{pitch, string?, finger?}, ...]}
@@ -228,16 +283,16 @@ function solveChords(events, key, maxPosition) {
         layers.push(combos);
     }
     var n = events.length;
-    var cost = [layers[0].map(function (st) { return chordLocalCost(st.combo, st.pos); })];
+    var cost = [layers[0].map(chordLocalCost)];
     var back = [layers[0].map(function () { return -1; })];
     for (var t = 1; t < n; t++) {
         var ct = [], bt = [];
         for (var j = 0; j < layers[t].length; j++) {
-            var lc = chordLocalCost(layers[t][j].combo, layers[t][j].pos);
+            var lc = chordLocalCost(layers[t][j]);
             var best = Infinity, bestK = -1;
             for (var k2 = 0; k2 < layers[t - 1].length; k2++) {
                 var cand = cost[t - 1][k2]
-                    + chordTransCost(layers[t - 1][k2].pos, layers[t][j].pos)
+                    + chordTransCost(layers[t - 1][k2], layers[t][j])
                     + lc;
                 if (cand < best) { best = cand; bestK = k2; }
             }

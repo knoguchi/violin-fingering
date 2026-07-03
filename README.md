@@ -45,8 +45,11 @@ positions, string numbers).
 ## Algorithm overview
 - State: (string, finger, position) per note, with accidental offset
 - Candidates for each pitch: enumerated by the key-signature finger layout
-- Cost: position-shift (heavy), string movement, accidental displacement,
-  with mild open-string and low-position preferences for tie-breaking
+- Cost: position-shift (heavy, discounted when masked by an open string),
+  bow crossing (convex in string distance: adjacent cheap, skips expensive),
+  same-finger string crossing (with a barre exception for perfect fifths on
+  adjacent strings), accidental displacement, with mild open-string and
+  low-position preferences for tie-breaking
 - Chord events solved as joint hand frames; open strings inherit position
 - Harmonics split the piece into independent segments
 
