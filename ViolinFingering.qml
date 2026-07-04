@@ -17,7 +17,7 @@ import "violin_fingering_core.js" as Core
 
 MuseScore {
     id: plugin
-    version: "1.0.1"
+    version: "1.1.0"
     title: "ViolinFingering"
     description: "Violin fingering (string/finger/position) by dynamic programming. Reads key signature; writes finger numbers and Roman-numeral position marks."
     categoryCode: "composing-arranging-tools"
@@ -36,6 +36,67 @@ MuseScore {
     property var trace: []
     function tlog(s) { trace.push(s); console.log("[ViolinFingering] " + s); }
 
+    // -- ownership of plugin-written annotations ----------
+    // Everything the plugin writes is recorded in a score meta tag
+    // ("violinFingering": JSON {v, items: [[tick, pitch, kind, text], ...]},
+    // kind "f"=finger, "s"=string, "p"=position mark, pitch -1 for staff
+    // text) and tinted with markerColor. On re-run, annotations matching
+    // their registry entry are removed and regenerated; a plugin-written
+    // text the user has edited no longer matches and is promoted to a
+    // user constraint. Marker-colored elements with no registry slot
+    // (registry lost or ticks shifted) fall back to plugin-owned.
+    // Plugin annotations are written in autoColor (visible blue) or, when
+    // colorize is unchecked, stealthColor (near-black); both are
+    // recognized as plugin-owned. Promoted (user-edited) elements are
+    // recolored to plain black.
+    property string stealthColor: "#010101"
+    property string autoColor: "#0065bf"
+    property var pluginEls: []     // elements to remove on this run
+    property var promotedEls: []   // edited by user: recolor to black
+    property var registry: null
+
+    function loadRegistry() {
+        var reg = {items: [], consumed: [], byKey: {}, byKind: {}};
+        try {
+            var raw = curScore.metaTag("violinFingering");
+            if (raw) reg.items = JSON.parse(raw).items || [];
+        } catch (e) { reg.items = []; }
+        for (var i = 0; i < reg.items.length; i++) {
+            var it = reg.items[i];
+            var key = it[0] + "|" + it[1] + "|" + it[2] + "|" + it[3];
+            if (!reg.byKey[key]) reg.byKey[key] = [];
+            reg.byKey[key].push(i);
+            reg.byKind[it[0] + "|" + it[1] + "|" + it[2]] = true;
+            reg.consumed.push(false);
+        }
+        return reg;
+    }
+
+    function isMarkerColored(el) {
+        var c = ("" + el.color).toLowerCase();   // "#rrggbb" or "#aarrggbb"
+        if (c.length < 7) return false;
+        var hex = c.substr(c.length - 6);
+        return hex === stealthColor.substr(1) || hex === autoColor.substr(1);
+    }
+
+    // "plugin" = remove and regenerate; "human" = honor as constraint.
+    function classifyAnnotation(reg, el, tick, pitch, kind, text) {
+        var idxs = reg.byKey[tick + "|" + pitch + "|" + kind + "|" + text];
+        if (idxs) {
+            for (var i = 0; i < idxs.length; i++)
+                if (!reg.consumed[idxs[i]]) { reg.consumed[idxs[i]] = true; return "plugin"; }
+        }
+        if (isMarkerColored(el)) {
+            // registered slot with different text = user edited it
+            if (reg.byKind[tick + "|" + pitch + "|" + kind]) {
+                promotedEls.push(el);
+                return "human";
+            }
+            return "plugin";
+        }
+        return "human";
+    }
+
     // -- score scanning ----------------------------------
     function collectEvents() {
         var cursor = curScore.newCursor();
@@ -50,6 +111,9 @@ MuseScore {
         var byTick = {};
         voiceCounts = [0, 0, 0, 0];
         voiceEvents = [[], [], [], []];
+        registry = loadRegistry();
+        pluginEls = [];
+        promotedEls = [];
         for (var voice = 0; voice < 4; voice++) {
             cursor.staffIdx = staffIdx;
             cursor.voice = voice;
@@ -57,6 +121,19 @@ MuseScore {
             cursor.staffIdx = staffIdx;
             cursor.voice = voice;
             while (cursor.segment && (endTick < 0 || cursor.tick < endTick)) {
+                // plugin-written position marks live on segments
+                if (voice === 0 && cursor.segment.annotations) {
+                    var anns = cursor.segment.annotations;
+                    for (var an = 0; an < anns.length; an++) {
+                        var a = anns[an];
+                        if (!a || a.type !== Element.STAFF_TEXT) continue;
+                        if (a.track !== undefined && Math.floor(a.track / 4) !== staffIdx) continue;
+                        var ptxt = ("" + a.text).replace(/<[^>]*>/g, "").trim();
+                        if (!/^(I|II|III|IV|V|VI|VII|VIII)$/.test(ptxt)) continue;
+                        if (classifyAnnotation(registry, a, cursor.tick, -1, "p", ptxt) === "plugin")
+                            pluginEls.push(a);
+                    }
+                }
                 var el = cursor.element;
                 if (el && el.type === Element.REST) {
                     voiceEvents[voice].push({tick: cursor.tick, rest: true,
@@ -82,7 +159,7 @@ MuseScore {
                         if (note.tieBack) continue;
                         voiceCounts[voice]++;
                         var p = note.pitch;
-                        var ann = readAnnotations(note);
+                        var ann = readAnnotations(note, cursor.tick);
                         var t = cursor.tick;
                         if (!byTick[t]) byTick[t] = {};
                         if (byTick[t][p]) {
@@ -110,7 +187,7 @@ MuseScore {
         return events;
     }
 
-    function readAnnotations(note) {
+    function readAnnotations(note, tick) {
         // Existing finger and string annotations are honored as constraints.
         // - Plain digits 1-4 = finger number
         // - Plain "0" on an open-string pitch (G3/D4/A4/E5) = open-string finger
@@ -118,25 +195,41 @@ MuseScore {
         //   at the node with the given finger). Marked harmonic, excluded
         //   from the fingering chain, original annotations preserved.
         // - Lone "0" on a non-open pitch = legacy harmonic marker (ignored)
+        // Plugin-owned annotations (see classifyAnnotation) are queued for
+        // removal instead and never become constraints.
         var out = {string: null, finger: null, harmonic: false};
         if (!note.elements) return out;
         var isOpenStringPitch = (note.pitch === 55 || note.pitch === 62
                               || note.pitch === 69 || note.pitch === 76);
-        var plainDigits = [];
+        var plainDigits = [], humanEls = [];
         for (var i = 0; i < note.elements.length; i++) {
             var el = note.elements[i];
             if (el.type !== Element.FINGERING) continue;
             var txt = ("" + el.text).replace(/<[^>]*>/g, "").trim();
-            if (!/^[0-9]$/.test(txt)) continue;
-            var v = parseInt(txt);
             var isString = false;
             try {
                 if (el.subStyle !== undefined && typeof Tid !== "undefined" &&
                     el.subStyle === Tid.STRING_NUMBER)
                     isString = true;
             } catch (e) {}
-            if (isString && v >= 1 && v <= 4) out.string = v;
-            else plainDigits.push(v);
+            var kind;
+            if (/^[0-9]$/.test(txt)) kind = isString ? "s" : "f";
+            else if (/^[①-④]$/.test(txt)) kind = "s";  // circled string number
+            else if (/^(I|II|III|IV)$/.test(txt)) kind = "s";    // legacy plugin string mark
+            else continue;
+            if (classifyAnnotation(registry, el, tick, note.pitch, kind, txt) === "plugin") {
+                pluginEls.push(el);
+                continue;
+            }
+            humanEls.push(el);
+            if (/^[①-④]$/.test(txt)) {
+                out.string = txt.charCodeAt(0) - 0x2460 + 1;
+                continue;
+            }
+            if (!/^[0-9]$/.test(txt)) continue;   // human Roman text: no constraint
+            var v = parseInt(txt);
+            if (kind === "s" && v >= 1 && v <= 4) out.string = v;
+            else if (kind === "f") plainDigits.push(v);
         }
         var hasZero = plainDigits.indexOf(0) >= 0;
         var nonZero = plainDigits.filter(function (d) { return d > 0 && d <= 4; });
@@ -147,6 +240,13 @@ MuseScore {
             out.finger = nonZero[0];
         } else if (plainDigits.length === 1 && plainDigits[0] === 0 && isOpenStringPitch) {
             out.finger = 0;
+        }
+        // Overwrite mode: manual finger/string annotations are replaced
+        // too (harmonic notation is always preserved).
+        if (overwrite.checked && !out.harmonic && humanEls.length) {
+            for (var r = 0; r < humanEls.length; r++) pluginEls.push(humanEls[r]);
+            out.string = null;
+            out.finger = null;
         }
         return out;
     }
@@ -172,61 +272,43 @@ MuseScore {
         return n[midi % 12] + (Math.floor(midi / 12) - 1);
     }
 
-    // -- diagnostics -------------------------------------
-    function diagnose() {
-        var lines = [];
-        function log(s) { lines.push(s); console.log("[ViolinFingering] " + s); }
-        log("ViolinFingering v1.0 / MuseScore " + (mscoreVersion !== undefined ? mscoreVersion : "?"));
-        if (!curScore) { log("no score is open"); return lines.join("\n"); }
-        log("score: " + curScore.scoreName + " / staves " + curScore.nstaves);
-        var key = readKeySignature();
-        log("key signature: " + key + " (sharps if +, flats if -)");
-        var events;
-        try { events = collectEvents(); }
-        catch (e) { log("exception while collecting: " + e); return lines.join("\n"); }
-        log("events: " + events.length);
-        if (events.length === 0) return lines.join("\n");
-        var lo = 999, hi = 0, maxNotes = 0;
-        var annStr = 0, annFing = 0;
-        for (var i = 0; i < events.length; i++) {
-            if (events[i].pitches.length > maxNotes) maxNotes = events[i].pitches.length;
-            for (var j = 0; j < events[i].pitches.length; j++) {
-                var p3 = events[i].pitches[j];
-                if (p3.midi < lo) lo = p3.midi;
-                if (p3.midi > hi) hi = p3.midi;
-                if (p3.string !== null) annStr++;
-                if (p3.finger !== null) annFing++;
-            }
+    // -- clear plugin annotations ------------------------
+    // Removes all plugin-owned annotations in the selection (or the whole
+    // score) and updates the registry. Manual annotations are untouched
+    // unless "Replace manual fingerings too" is checked.
+    function clearAnnotations() {
+        if (!curScore) { statusText.text = "No score is open"; return; }
+        collectEvents();   // classifies annotations into pluginEls/promotedEls
+        curScore.startCmd();
+        for (var pr = 0; pr < promotedEls.length; pr++) {
+            try { promotedEls[pr].color = "#000000"; } catch (e) {}
         }
-        log("pitch range: " + noteName(lo) + "(" + lo + ") - " + noteName(hi) + "(" + hi + ")");
-        log("max simultaneous notes: " + maxNotes + " / annotations: strings " + annStr + " fingers " + annFing);
-        log("notes per voice: " + voiceCounts.join(" / "));
-        // Try to solve
-        try {
-            var chordEv = events.map(function (e) {
-                return {pitches: e.pitches.map(function (p) {
-                    return {pitch: p.midi, string: p.string, finger: p.finger};
-                })};
-            });
-            var result = Core.solveChords(chordEv, key, 7);
-            log(result ? "Viterbi: solution found (ready to write)"
-                       : "Viterbi: no solution (some notes unplayable on violin)");
-            if (!result) {
-                for (var k = 0; k < events.length; k++) {
-                    var cand = Core.candidatesForPitch(events[k].pitches[0].midi, key, 7);
-                    if (cand.length === 0) {
-                        log("unplayable: " + noteName(events[k].pitches[0].midi) + " at tick " + events[k].tick);
-                        if (lines.length > 30) break;
-                    }
-                }
-            }
-        } catch (e2) { log("solve exception: " + e2); }
-        return lines.join("\n");
+        var removed = 0;
+        for (var r = 0; r < pluginEls.length; r++) {
+            try { removeElement(pluginEls[r]); removed++; } catch (e2) {}
+        }
+        var items = [];
+        for (var q = 0; q < registry.items.length; q++)
+            if (!registry.consumed[q]) items.push(registry.items[q]);
+        curScore.setMetaTag("violinFingering", JSON.stringify({v: 1, items: items}));
+        curScore.endCmd();
+        statusText.text = "Cleared " + removed + " plugin annotation" + (removed === 1 ? "" : "s")
+            + (items.length ? " (" + items.length + " outside the selection kept)" : "");
     }
 
     // -- write fingering annotations ---------------------
     function writeAnnotations(events, result) {
         curScore.startCmd();
+        // annotations the user edited are theirs now: recolor to black
+        for (var pr = 0; pr < promotedEls.length; pr++) {
+            try { promotedEls[pr].color = "#000000"; } catch (e) {}
+        }
+        // remove what the plugin wrote on a previous run
+        for (var r = 0; r < pluginEls.length; r++) {
+            try { removeElement(pluginEls[r]); } catch (e) {}
+        }
+        var markerColor = colorize.checked ? autoColor : stealthColor;
+        var newItems = [];
         var nFing = 0, nStr = 0, nPos = 0, nSkip = 0;
         var prevPos = -1;
         var cursor = curScore.newCursor();
@@ -246,14 +328,28 @@ MuseScore {
                     // open string finger = 0
                     var fing = newElement(Element.FINGERING);
                     fing.text = "" + k;
+                    fing.color = markerColor;
                     noteRefs[0].add(fing);
+                    newItems.push([events[i].tick, pitchInfo.midi, "f", "" + k]);
                     nFing++;
                 }
                 if (writeStrings.checked && !hadString) {
                     var stringNum = 4 - s;
                     var sn = newElement(Element.FINGERING);
-                    sn.text = ["I","II","III","IV"][stringNum - 1];
+                    // Real string number = FINGERING with the String Number
+                    // text style; MuseScore draws the circle itself.
+                    var styled = false;
+                    try {
+                        if (typeof Tid !== "undefined") {
+                            sn.subStyle = Tid.STRING_NUMBER;
+                            styled = true;
+                        }
+                    } catch (e3) {}
+                    sn.text = styled ? "" + stringNum
+                                     : ["①","②","③","④"][stringNum - 1];
+                    sn.color = markerColor;
                     noteRefs[0].add(sn);
+                    newItems.push([events[i].tick, pitchInfo.midi, "s", sn.text]);
                     nStr++;
                 }
             }
@@ -262,11 +358,20 @@ MuseScore {
                 cursor.rewindToTick(events[i].tick);
                 var stx = newElement(Element.STAFF_TEXT);
                 stx.text = Core.ROMAN[handPos];
+                stx.color = markerColor;
                 cursor.add(stx);
+                newItems.push([events[i].tick, -1, "p", stx.text]);
                 prevPos = handPos;
                 nPos++;
             }
         }
+        // Persist the registry: entries not consumed this run (e.g. outside
+        // the selection) survive; consumed ones are replaced by newItems.
+        var items = [];
+        for (var q = 0; q < registry.items.length; q++)
+            if (!registry.consumed[q]) items.push(registry.items[q]);
+        items = items.concat(newItems);
+        curScore.setMetaTag("violinFingering", JSON.stringify({v: 1, items: items}));
         curScore.endCmd();
         return {fing: nFing, str: nStr, pos: nPos, skip: nSkip};
     }
@@ -329,8 +434,13 @@ MuseScore {
         var hasAnySolved = result.some(function (r) { return r && !r.harmonic; });
         result = hasAnySolved ? result : null;
         if (!result) {
+            var bad = [];
+            for (var bi = 0; bi < events.length && bad.length < 10; bi++)
+                for (var bj = 0; bj < events[bi].pitches.length && bad.length < 10; bj++)
+                    if (Core.candidatesForPitch(events[bi].pitches[bj].midi, key, 7).length === 0)
+                        bad.push(noteName(events[bi].pitches[bj].midi) + " at tick " + events[bi].tick);
             statusText.text = "ViolinFingering could not solve this score (some notes outside violin range).\n"
-                + "Click Diagnose to see which notes are unplayable.\n"
+                + (bad.length ? "Unplayable: " + bad.join(", ") + "\n" : "")
                 + "Report issues at https://github.com/knoguchi/violin-fingering/issues";
             return;
         }
@@ -366,8 +476,9 @@ MuseScore {
         }
         CheckBox { id: writeFingers;   checked: true;  text: "Write left-hand finger numbers (1-4)" }
         CheckBox { id: writePositions; checked: true;  text: "Write positions (Roman numerals)" }
-        CheckBox { id: writeStrings;   checked: false; text: "Write string numbers (I=E, II=A, III=D, IV=G)" }
-        CheckBox { id: overwrite;      checked: false; text: "Also write on notes with existing annotations" }
+        CheckBox { id: writeStrings;   checked: false; text: "Write string numbers (①=E, ②=A, ③=D, ④=G)" }
+        CheckBox { id: colorize;       checked: true;  text: "Color auto-written annotations blue" }
+        CheckBox { id: overwrite;      checked: false; text: "Replace manual fingerings too (plugin's own are always replaced)" }
         RowLayout {
             Button {
                 text: "Run"
@@ -379,16 +490,12 @@ MuseScore {
                 }
             }
             Button {
-                text: "Diagnose"
+                text: "Clear"
                 onClicked: {
-                    try { statusText.text = plugin.diagnose(); }
-                    catch (e) { statusText.text = "Exception in diagnostics: " + e + "\n" + (e.stack || "")
+                    try { plugin.clearAnnotations(); }
+                    catch (e) { statusText.text = "Exception while clearing: " + e + "\n" + (e.stack || "")
                         + "\nPlease report: https://github.com/knoguchi/violin-fingering/issues"; }
                 }
-            }
-            Button {
-                text: "Copy log"
-                onClicked: { statusText.selectAll(); statusText.copy(); statusText.deselect(); }
             }
             Button { text: "Close"; onClicked: quit() }
         }
@@ -400,7 +507,7 @@ MuseScore {
             TextEdit {
                 id: statusText
                 width: parent.width
-                text: "v1.0.1 - Run computes violin fingering and writes annotations. Chord events are solved as joint hand frames. Use Copy log to share results. Issues: github.com/knoguchi/violin-fingering"
+                text: "v1.1.0 - Run computes violin fingering and writes annotations; re-running replaces the plugin's own annotations while manual ones are honored as constraints. Clear removes the plugin's annotations. Issues: github.com/knoguchi/violin-fingering"
                 wrapMode: TextEdit.Wrap
                 readOnly: true
                 selectByMouse: true

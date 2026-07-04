@@ -36,8 +36,17 @@ Annotated by the plugin:
 ## Usage
 - **Run**: computes fingering for the selection (or the whole score) and writes
   finger numbers and position marks as annotations on the staff.
-- **Diagnose**: prints solver statistics without writing.
-- **Copy log**: copies the full report to the clipboard.
+  Re-running (e.g. after a plugin update) replaces the plugin's own previous
+  annotations: everything the plugin writes is tracked in a score meta tag
+  and colored blue (or a near-black #010101 when "Color auto-written
+  annotations" is unchecked). Manual annotations are honored as
+  constraints — including plugin-written ones you have since edited, which
+  are recolored to plain black to show they are now yours. Check "Replace
+  manual fingerings too" to discard those as well (harmonic notation is
+  always preserved).
+- **Clear**: removes the plugin's annotations from the selection (or the
+  whole score). Manual annotations are untouched unless "Replace manual
+  fingerings too" is checked.
 
 Checkboxes control which kinds of annotation to write (finger numbers,
 positions, string numbers).
