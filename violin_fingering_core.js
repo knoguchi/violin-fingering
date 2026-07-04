@@ -77,6 +77,9 @@ var W_FINGER_MOVE = 0.1;
 // adjacent strings is a one-finger barre.
 var W_SAME_FINGER_CROSS = 1.5;
 var W_BARRE = 0.2;
+// Same finger sliding a semitone on the same string (audible slide or
+// lift-replace). Must cost more than switching to the adjacent finger.
+var W_SEMITONE_SLIDE = 0.5;
 var W_OPEN_BONUS = -0.2;
 // Displacing a finger from its key frame. True accidentals pay this on
 // every candidate equally; it mainly discourages a displaced finger when
@@ -101,6 +104,7 @@ function transitionCost(prev, cur) {
         }
     }
     else if (k1 !== k2 && k1 > 0 && k2 > 0) c += W_FINGER_MOVE;
+    else if (k1 === k2 && k1 > 0 && prev[3] !== cur[3]) c += W_SEMITONE_SLIDE;
     return c;
 }
 
@@ -267,6 +271,8 @@ function chordTransCost(prev, cur) {
             c += barre ? W_BARRE : W_SAME_FINGER_CROSS;
         } else if (a[0] === b[0] && a[1] > 0 && b[1] > 0 && a[1] !== b[1]) {
             c += W_FINGER_MOVE;
+        } else if (a[0] === b[0] && a[1] > 0 && a[1] === b[1] && a[3] !== b[3]) {
+            c += W_SEMITONE_SLIDE;
         }
     }
     return c;
