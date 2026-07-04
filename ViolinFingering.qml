@@ -214,13 +214,18 @@ MuseScore {
             } catch (e) {}
             var kind;
             if (/^[0-9]$/.test(txt)) kind = isString ? "s" : "f";
-            else if (/^(I|II|III|IV)$/.test(txt)) kind = "s";  // plugin string mark
+            else if (/^[①-④]$/.test(txt)) kind = "s";  // circled string number
+            else if (/^(I|II|III|IV)$/.test(txt)) kind = "s";    // legacy plugin string mark
             else continue;
             if (classifyAnnotation(registry, el, tick, note.pitch, kind, txt) === "plugin") {
                 pluginEls.push(el);
                 continue;
             }
             humanEls.push(el);
+            if (/^[①-④]$/.test(txt)) {
+                out.string = txt.charCodeAt(0) - 0x2460 + 1;
+                continue;
+            }
             if (!/^[0-9]$/.test(txt)) continue;   // human Roman text: no constraint
             var v = parseInt(txt);
             if (kind === "s" && v >= 1 && v <= 4) out.string = v;
@@ -331,7 +336,7 @@ MuseScore {
                 if (writeStrings.checked && !hadString) {
                     var stringNum = 4 - s;
                     var sn = newElement(Element.FINGERING);
-                    sn.text = ["I","II","III","IV"][stringNum - 1];
+                    sn.text = ["①","②","③","④"][stringNum - 1];
                     sn.color = markerColor;
                     noteRefs[0].add(sn);
                     newItems.push([events[i].tick, pitchInfo.midi, "s", sn.text]);
@@ -461,7 +466,7 @@ MuseScore {
         }
         CheckBox { id: writeFingers;   checked: true;  text: "Write left-hand finger numbers (1-4)" }
         CheckBox { id: writePositions; checked: true;  text: "Write positions (Roman numerals)" }
-        CheckBox { id: writeStrings;   checked: false; text: "Write string numbers (I=E, II=A, III=D, IV=G)" }
+        CheckBox { id: writeStrings;   checked: false; text: "Write string numbers (①=E, ②=A, ③=D, ④=G)" }
         CheckBox { id: colorize;       checked: true;  text: "Color auto-written annotations blue" }
         CheckBox { id: overwrite;      checked: false; text: "Replace manual fingerings too (plugin's own are always replaced)" }
         RowLayout {
