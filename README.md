@@ -48,7 +48,8 @@ positions, string numbers).
 - Cost: position-shift (heavy, discounted when masked by an open string),
   bow crossing (convex in string distance: adjacent cheap, skips expensive),
   same-finger string crossing (with a barre exception for perfect fifths on
-  adjacent strings), accidental displacement, with mild open-string and
+  adjacent strings), same-finger semitone slides, finger stretches beyond
+  the hand frame, accidental displacement, with mild open-string and
   low-position preferences for tie-breaking
 - Chord events solved as joint hand frames; open strings inherit position
 - Harmonics split the piece into independent segments

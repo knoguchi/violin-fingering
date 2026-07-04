@@ -50,14 +50,14 @@ function candidatesForPitch(pitch, key, maxPosition) {
     if (maxPosition === undefined) maxPosition = 7;
     var out = [];
     for (var s = 0; s < 4; s++) {
-        if (pitch === TUNING[s]) { out.push([s, 0, 1, 0]); continue; }
+        if (pitch === TUNING[s]) { out.push([s, 0, 1, 0, pitch]); continue; }
         if (pitch < TUNING[s]) continue;
         for (var p = 1; p <= maxPosition; p++) {
             for (var k = 1; k <= 4; k++) {
                 var nominal = fingerPitch(s, p, k, key);
                 var off = pitch - nominal;
-                if (off === 0) out.push([s, k, p, 0]);
-                else if (off === 1 || off === -1) out.push([s, k, p, off]);
+                if (off === 0) out.push([s, k, p, 0, pitch]);
+                else if (off === 1 || off === -1) out.push([s, k, p, off, pitch]);
             }
         }
     }
@@ -76,10 +76,13 @@ var W_FINGER_MOVE = 0.1;
 // risk), comparable to a small shift. Exception: a perfect fifth on
 // adjacent strings is a one-finger barre.
 var W_SAME_FINGER_CROSS = 1.5;
-var W_BARRE = 0.2;
+var W_BARRE = 0.1;
 // Same finger sliding a semitone on the same string (audible slide or
 // lift-replace). Must cost more than switching to the adjacent finger.
 var W_SEMITONE_SLIDE = 0.5;
+// Same-string finger move reaching beyond the hand frame (~2 semitones
+// per finger step), per excess semitone.
+var W_STRETCH = 0.4;
 var W_OPEN_BONUS = -0.2;
 // Displacing a finger from its key frame. True accidentals pay this on
 // every candidate equally; it mainly discourages a displaced finger when
@@ -99,11 +102,18 @@ function transitionCost(prev, cur) {
     if (s1 !== s2) {
         c += W_CROSS[Math.min(Math.abs(s1 - s2), 3)];
         if (k1 > 0 && k1 === k2) {
-            var barre = Math.abs(s1 - s2) === 1 && p1 === p2 && prev[3] === cur[3];
+            // Barre = same physical spot on adjacent strings (perfect fifth),
+            // regardless of how the key frame labels the two notes.
+            var barre = Math.abs(s1 - s2) === 1
+                && prev[4] - TUNING[s1] === cur[4] - TUNING[s2];
             c += barre ? W_BARRE : W_SAME_FINGER_CROSS;
         }
     }
-    else if (k1 !== k2 && k1 > 0 && k2 > 0) c += W_FINGER_MOVE;
+    else if (k1 !== k2 && k1 > 0 && k2 > 0) {
+        c += W_FINGER_MOVE;
+        var stretch = Math.abs(prev[4] - cur[4]) - 2 * Math.abs(k1 - k2);
+        if (stretch > 0) c += W_STRETCH * stretch;
+    }
     else if (k1 === k2 && k1 > 0 && prev[3] !== cur[3]) c += W_SEMITONE_SLIDE;
     return c;
 }
@@ -267,10 +277,15 @@ function chordTransCost(prev, cur) {
     if (prev.combo.length === 1 && cur.combo.length === 1) {
         var a = prev.combo[0], b = cur.combo[0];
         if (a[1] > 0 && a[1] === b[1] && a[0] !== b[0]) {
-            var barre = Math.abs(a[0] - b[0]) === 1 && a[2] === b[2] && a[3] === b[3];
+            // Barre = same physical spot on adjacent strings (perfect fifth),
+            // regardless of how the key frame labels the two notes.
+            var barre = Math.abs(a[0] - b[0]) === 1
+                && a[4] - TUNING[a[0]] === b[4] - TUNING[b[0]];
             c += barre ? W_BARRE : W_SAME_FINGER_CROSS;
         } else if (a[0] === b[0] && a[1] > 0 && b[1] > 0 && a[1] !== b[1]) {
             c += W_FINGER_MOVE;
+            var stretch = Math.abs(a[4] - b[4]) - 2 * Math.abs(a[1] - b[1]);
+            if (stretch > 0) c += W_STRETCH * stretch;
         } else if (a[0] === b[0] && a[1] > 0 && a[1] === b[1] && a[3] !== b[3]) {
             c += W_SEMITONE_SLIDE;
         }
