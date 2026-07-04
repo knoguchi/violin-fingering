@@ -338,7 +338,9 @@ MuseScore {
         // Position distribution
         var posDist = {};
         for (var i = 0; i < result.length; i++) {
-            var p = result[i].pos;
+            var st = result[i];
+            if (!st || st.harmonic) continue;
+            var p = st.pos;
             posDist[p] = (posDist[p] || 0) + 1;
         }
         var posStr = Object.keys(posDist).sort().map(function (k) {
