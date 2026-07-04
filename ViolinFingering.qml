@@ -336,7 +336,17 @@ MuseScore {
                 if (writeStrings.checked && !hadString) {
                     var stringNum = 4 - s;
                     var sn = newElement(Element.FINGERING);
-                    sn.text = ["①","②","③","④"][stringNum - 1];
+                    // Real string number = FINGERING with the String Number
+                    // text style; MuseScore draws the circle itself.
+                    var styled = false;
+                    try {
+                        if (typeof Tid !== "undefined") {
+                            sn.subStyle = Tid.STRING_NUMBER;
+                            styled = true;
+                        }
+                    } catch (e3) {}
+                    sn.text = styled ? "" + stringNum
+                                     : ["①","②","③","④"][stringNum - 1];
                     sn.color = markerColor;
                     noteRefs[0].add(sn);
                     newItems.push([events[i].tick, pitchInfo.midi, "s", sn.text]);
