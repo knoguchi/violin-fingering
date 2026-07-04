@@ -38,10 +38,12 @@ Annotated by the plugin:
   finger numbers and position marks as annotations on the staff.
   Re-running (e.g. after a plugin update) replaces the plugin's own previous
   annotations: everything the plugin writes is tracked in a score meta tag
-  and tinted with a near-black marker color (#010101). Manual annotations —
-  including plugin-written ones you have since edited — are honored as
-  constraints. Check "Replace manual fingerings too" to discard those as
-  well (harmonic notation is always preserved).
+  and colored blue (or a near-black #010101 when "Color auto-written
+  annotations" is unchecked). Manual annotations are honored as
+  constraints — including plugin-written ones you have since edited, which
+  are recolored to plain black to show they are now yours. Check "Replace
+  manual fingerings too" to discard those as well (harmonic notation is
+  always preserved).
 - **Diagnose**: prints solver statistics without writing.
 - **Copy log**: copies the full report to the clipboard.
 

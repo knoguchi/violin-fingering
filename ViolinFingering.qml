@@ -45,8 +45,14 @@ MuseScore {
     // text the user has edited no longer matches and is promoted to a
     // user constraint. Marker-colored elements with no registry slot
     // (registry lost or ticks shifted) fall back to plugin-owned.
-    property string markerColor: "#010101"
+    // Plugin annotations are written in autoColor (visible blue) or, when
+    // colorize is unchecked, stealthColor (near-black); both are
+    // recognized as plugin-owned. Promoted (user-edited) elements are
+    // recolored to plain black.
+    property string stealthColor: "#010101"
+    property string autoColor: "#0065bf"
     property var pluginEls: []     // elements to remove on this run
+    property var promotedEls: []   // edited by user: recolor to black
     property var registry: null
 
     function loadRegistry() {
@@ -68,7 +74,9 @@ MuseScore {
 
     function isMarkerColored(el) {
         var c = ("" + el.color).toLowerCase();   // "#rrggbb" or "#aarrggbb"
-        return c.length >= 7 && c.substr(c.length - 6) === markerColor.substr(1);
+        if (c.length < 7) return false;
+        var hex = c.substr(c.length - 6);
+        return hex === stealthColor.substr(1) || hex === autoColor.substr(1);
     }
 
     // "plugin" = remove and regenerate; "human" = honor as constraint.
@@ -80,7 +88,10 @@ MuseScore {
         }
         if (isMarkerColored(el)) {
             // registered slot with different text = user edited it
-            if (reg.byKind[tick + "|" + pitch + "|" + kind]) return "human";
+            if (reg.byKind[tick + "|" + pitch + "|" + kind]) {
+                promotedEls.push(el);
+                return "human";
+            }
             return "plugin";
         }
         return "human";
@@ -102,6 +113,7 @@ MuseScore {
         voiceEvents = [[], [], [], []];
         registry = loadRegistry();
         pluginEls = [];
+        promotedEls = [];
         for (var voice = 0; voice < 4; voice++) {
             cursor.staffIdx = staffIdx;
             cursor.voice = voice;
@@ -310,10 +322,15 @@ MuseScore {
     // -- write fingering annotations ---------------------
     function writeAnnotations(events, result) {
         curScore.startCmd();
+        // annotations the user edited are theirs now: recolor to black
+        for (var pr = 0; pr < promotedEls.length; pr++) {
+            try { promotedEls[pr].color = "#000000"; } catch (e) {}
+        }
         // remove what the plugin wrote on a previous run
         for (var r = 0; r < pluginEls.length; r++) {
             try { removeElement(pluginEls[r]); } catch (e) {}
         }
+        var markerColor = colorize.checked ? autoColor : stealthColor;
         var newItems = [];
         var nFing = 0, nStr = 0, nPos = 0, nSkip = 0;
         var prevPos = -1;
@@ -468,6 +485,7 @@ MuseScore {
         CheckBox { id: writeFingers;   checked: true;  text: "Write left-hand finger numbers (1-4)" }
         CheckBox { id: writePositions; checked: true;  text: "Write positions (Roman numerals)" }
         CheckBox { id: writeStrings;   checked: false; text: "Write string numbers (I=E, II=A, III=D, IV=G)" }
+        CheckBox { id: colorize;       checked: true;  text: "Color auto-written annotations blue" }
         CheckBox { id: overwrite;      checked: false; text: "Replace manual fingerings too (plugin's own are always replaced)" }
         RowLayout {
             Button {
