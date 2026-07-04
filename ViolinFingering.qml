@@ -267,56 +267,28 @@ MuseScore {
         return n[midi % 12] + (Math.floor(midi / 12) - 1);
     }
 
-    // -- diagnostics -------------------------------------
-    function diagnose() {
-        var lines = [];
-        function log(s) { lines.push(s); console.log("[ViolinFingering] " + s); }
-        log("ViolinFingering v1.0 / MuseScore " + (mscoreVersion !== undefined ? mscoreVersion : "?"));
-        if (!curScore) { log("no score is open"); return lines.join("\n"); }
-        log("score: " + curScore.scoreName + " / staves " + curScore.nstaves);
-        var key = readKeySignature();
-        log("key signature: " + key + " (sharps if +, flats if -)");
-        var events;
-        try { events = collectEvents(); }
-        catch (e) { log("exception while collecting: " + e); return lines.join("\n"); }
-        log("events: " + events.length);
-        if (events.length === 0) return lines.join("\n");
-        var lo = 999, hi = 0, maxNotes = 0;
-        var annStr = 0, annFing = 0;
-        for (var i = 0; i < events.length; i++) {
-            if (events[i].pitches.length > maxNotes) maxNotes = events[i].pitches.length;
-            for (var j = 0; j < events[i].pitches.length; j++) {
-                var p3 = events[i].pitches[j];
-                if (p3.midi < lo) lo = p3.midi;
-                if (p3.midi > hi) hi = p3.midi;
-                if (p3.string !== null) annStr++;
-                if (p3.finger !== null) annFing++;
-            }
+    // -- clear plugin annotations ------------------------
+    // Removes all plugin-owned annotations in the selection (or the whole
+    // score) and updates the registry. Manual annotations are untouched
+    // unless "Replace manual fingerings too" is checked.
+    function clearAnnotations() {
+        if (!curScore) { statusText.text = "No score is open"; return; }
+        collectEvents();   // classifies annotations into pluginEls/promotedEls
+        curScore.startCmd();
+        for (var pr = 0; pr < promotedEls.length; pr++) {
+            try { promotedEls[pr].color = "#000000"; } catch (e) {}
         }
-        log("pitch range: " + noteName(lo) + "(" + lo + ") - " + noteName(hi) + "(" + hi + ")");
-        log("max simultaneous notes: " + maxNotes + " / annotations: strings " + annStr + " fingers " + annFing);
-        log("notes per voice: " + voiceCounts.join(" / "));
-        // Try to solve
-        try {
-            var chordEv = events.map(function (e) {
-                return {pitches: e.pitches.map(function (p) {
-                    return {pitch: p.midi, string: p.string, finger: p.finger};
-                })};
-            });
-            var result = Core.solveChords(chordEv, key, 7);
-            log(result ? "Viterbi: solution found (ready to write)"
-                       : "Viterbi: no solution (some notes unplayable on violin)");
-            if (!result) {
-                for (var k = 0; k < events.length; k++) {
-                    var cand = Core.candidatesForPitch(events[k].pitches[0].midi, key, 7);
-                    if (cand.length === 0) {
-                        log("unplayable: " + noteName(events[k].pitches[0].midi) + " at tick " + events[k].tick);
-                        if (lines.length > 30) break;
-                    }
-                }
-            }
-        } catch (e2) { log("solve exception: " + e2); }
-        return lines.join("\n");
+        var removed = 0;
+        for (var r = 0; r < pluginEls.length; r++) {
+            try { removeElement(pluginEls[r]); removed++; } catch (e2) {}
+        }
+        var items = [];
+        for (var q = 0; q < registry.items.length; q++)
+            if (!registry.consumed[q]) items.push(registry.items[q]);
+        curScore.setMetaTag("violinFingering", JSON.stringify({v: 1, items: items}));
+        curScore.endCmd();
+        statusText.text = "Cleared " + removed + " plugin annotation" + (removed === 1 ? "" : "s")
+            + (items.length ? " (" + items.length + " outside the selection kept)" : "");
     }
 
     // -- write fingering annotations ---------------------
@@ -447,8 +419,13 @@ MuseScore {
         var hasAnySolved = result.some(function (r) { return r && !r.harmonic; });
         result = hasAnySolved ? result : null;
         if (!result) {
+            var bad = [];
+            for (var bi = 0; bi < events.length && bad.length < 10; bi++)
+                for (var bj = 0; bj < events[bi].pitches.length && bad.length < 10; bj++)
+                    if (Core.candidatesForPitch(events[bi].pitches[bj].midi, key, 7).length === 0)
+                        bad.push(noteName(events[bi].pitches[bj].midi) + " at tick " + events[bi].tick);
             statusText.text = "ViolinFingering could not solve this score (some notes outside violin range).\n"
-                + "Click Diagnose to see which notes are unplayable.\n"
+                + (bad.length ? "Unplayable: " + bad.join(", ") + "\n" : "")
                 + "Report issues at https://github.com/knoguchi/violin-fingering/issues";
             return;
         }
@@ -498,16 +475,12 @@ MuseScore {
                 }
             }
             Button {
-                text: "Diagnose"
+                text: "Clear"
                 onClicked: {
-                    try { statusText.text = plugin.diagnose(); }
-                    catch (e) { statusText.text = "Exception in diagnostics: " + e + "\n" + (e.stack || "")
+                    try { plugin.clearAnnotations(); }
+                    catch (e) { statusText.text = "Exception while clearing: " + e + "\n" + (e.stack || "")
                         + "\nPlease report: https://github.com/knoguchi/violin-fingering/issues"; }
                 }
-            }
-            Button {
-                text: "Copy log"
-                onClicked: { statusText.selectAll(); statusText.copy(); statusText.deselect(); }
             }
             Button { text: "Close"; onClicked: quit() }
         }
@@ -519,7 +492,7 @@ MuseScore {
             TextEdit {
                 id: statusText
                 width: parent.width
-                text: "v1.1.0 - Run computes violin fingering and writes annotations; re-running replaces the plugin's own annotations while manual ones are honored as constraints. Use Copy log to share results. Issues: github.com/knoguchi/violin-fingering"
+                text: "v1.1.0 - Run computes violin fingering and writes annotations; re-running replaces the plugin's own annotations while manual ones are honored as constraints. Clear removes the plugin's annotations. Issues: github.com/knoguchi/violin-fingering"
                 wrapMode: TextEdit.Wrap
                 readOnly: true
                 selectByMouse: true

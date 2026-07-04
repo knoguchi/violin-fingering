@@ -44,8 +44,9 @@ Annotated by the plugin:
   are recolored to plain black to show they are now yours. Check "Replace
   manual fingerings too" to discard those as well (harmonic notation is
   always preserved).
-- **Diagnose**: prints solver statistics without writing.
-- **Copy log**: copies the full report to the clipboard.
+- **Clear**: removes the plugin's annotations from the selection (or the
+  whole score). Manual annotations are untouched unless "Replace manual
+  fingerings too" is checked.
 
 Checkboxes control which kinds of annotation to write (finger numbers,
 positions, string numbers).
