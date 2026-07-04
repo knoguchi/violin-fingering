@@ -71,7 +71,6 @@ var W_POS_FIXED = 2.5;
 // Adjacent crossings are nearly free; skipping over strings is a real
 // bow maneuver and must cost more than linearly.
 var W_CROSS = [0.0, 0.5, 2.5, 5.0];
-var W_FINGER_MOVE = 0.1;
 // Same finger jumping to another string must lift and replace (gap/smear
 // risk), comparable to a small shift. Exception: a perfect fifth on
 // adjacent strings is a one-finger barre.
@@ -110,7 +109,6 @@ function transitionCost(prev, cur) {
         }
     }
     else if (k1 !== k2 && k1 > 0 && k2 > 0) {
-        c += W_FINGER_MOVE;
         var stretch = Math.abs(prev[4] - cur[4]) - 2 * Math.abs(k1 - k2);
         if (stretch > 0) c += W_STRETCH * stretch;
     }
@@ -283,7 +281,8 @@ function chordTransCost(prev, cur) {
                 && a[4] - TUNING[a[0]] === b[4] - TUNING[b[0]];
             c += barre ? W_BARRE : W_SAME_FINGER_CROSS;
         } else if (a[0] === b[0] && a[1] > 0 && b[1] > 0 && a[1] !== b[1]) {
-            c += W_FINGER_MOVE;
+            // Dropping/lifting to another finger in frame is free;
+            // only reaching beyond the frame costs.
             var stretch = Math.abs(a[4] - b[4]) - 2 * Math.abs(a[1] - b[1]);
             if (stretch > 0) c += W_STRETCH * stretch;
         } else if (a[0] === b[0] && a[1] > 0 && a[1] === b[1] && a[3] !== b[3]) {
