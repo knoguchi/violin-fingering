@@ -63,8 +63,9 @@ test('open string still used when fingering it costs extra crossings', function 
     assert.strictEqual(res[1].combo[0][STR], 3, 'E5 on the E string');
 });
 
-// Regression: Bach A minor concerto, movement 1, measure 5 (issue reported
-// 2026-07-06). With the opening E5 pinned to the 1st finger (4th position),
+// Regression: Vivaldi RV 522 (A minor), measure 5 of the user's score
+// (issue reported 2026-07-06). With the opening E5 pinned to the 1st
+// finger (4th position),
 // the whole measure is playable in IV without a single shift. The solver
 // used to drop to the open E and shift to III, putting A5 on the 1st
 // finger of the E string.
