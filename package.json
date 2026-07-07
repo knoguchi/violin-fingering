@@ -1,0 +1,8 @@
+{
+  "name": "violin-fingering",
+  "private": true,
+  "description": "MuseScore violin fingering plugin - tests for the pure-JS core",
+  "scripts": {
+    "test": "node --test"
+  }
+}
