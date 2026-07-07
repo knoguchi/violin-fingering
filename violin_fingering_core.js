@@ -298,7 +298,32 @@ function chordTransCost(prev, cur) {
 
 // Solve chord events. Each event = {pitches: [{pitch, string?, finger?}, ...]}
 // Returns aligned list of {combo, pos} or null.
+//
+// A manually noted finger is a reset: the player has declared where the
+// hand is, so the chain restarts there. Each segment [pin, next pin) is
+// solved independently - downstream context cannot drag notes before a
+// pin away from the pinned position, and vice versa.
 function solveChords(events, key, maxPosition) {
+    if (!events.length) return [];
+    var out = [];
+    var start = 0;
+    for (var i = 1; i <= events.length; i++) {
+        if (i < events.length && !eventHasPin(events[i])) continue;
+        var seg = solveChordSeg(events.slice(start, i), key, maxPosition);
+        if (!seg) return null;
+        out = out.concat(seg);
+        start = i;
+    }
+    return out;
+}
+
+function eventHasPin(e) {
+    for (var i = 0; i < e.pitches.length; i++)
+        if (e.pitches[i].finger != null) return true;
+    return false;
+}
+
+function solveChordSeg(events, key, maxPosition) {
     if (!events.length) return [];
     var layers = [];
     for (var i = 0; i < events.length; i++) {

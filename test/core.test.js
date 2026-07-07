@@ -73,8 +73,15 @@ test('open string still used when fingering it costs extra crossings', function 
 // bug needs the neighboring measures' pins (m7's A5 = 1 prefers III) to
 // manifest. The old cost model then dropped out of IV right after the
 // pinned E5, putting m5's A5 on the 1st finger of the E string in III.
-// With the opening E5 pinned to 1 (IV), the whole A5 phrase must stay in
-// IV with A5 on the 4th finger.
+// Pinning E5 to 1 (IV) anticipates A5 on the 4th finger: the hand must
+// stay in IV, with no shift, until the next manual pin resets the chain.
+function m5m7(notes) {
+    return notes.map(function (ns) {
+        return {pitches: ns.map(function (n) {
+            return Array.isArray(n) ? {pitch: n[0], finger: n[1]} : {pitch: n};
+        })};
+    });
+}
 var M5_M7 = [
     [[76, 1]], [72], [71], [72], [76], [81], [81], [74], [71], [69],
     [71], [[74, 1]], [79],
@@ -84,15 +91,11 @@ var M5_M7 = [
     [77], [[67, 1]], [[69, 2]], [71], [72], [74], [76], [79], [84], [76]
 ];
 
-test('m5 regression: A5 phrase stays in 4th position, A5 on 4th finger', function () {
-    var events = M5_M7.map(function (notes) {
-        return {pitches: notes.map(function (n) {
-            return Array.isArray(n) ? {pitch: n[0], finger: n[1]} : {pitch: n};
-        })};
-    });
-    var res = core.solveChords(events, 0, 7);
-    // events 0-8: E5 C5 B4 C5 E5 A5 A5 D5 B4 - the phrase under the pin
-    for (var i = 0; i < 9; i++) {
+test('m5 regression: stays in 4th position until the next pin', function () {
+    var res = core.solveChords(m5m7(M5_M7), 0, 7);
+    // events 0-10: E5 C5 B4 C5 E5 A5 A5 D5 B4 A4 B4 - everything from the
+    // E5 pin up to the D5 pin holds 4th position, nothing open
+    for (var i = 0; i <= 10; i++) {
         assert.strictEqual(res[i].pos, 4, 'event ' + i + ' in 4th position');
         assert.notStrictEqual(res[i].combo[0][FING], 0, 'event ' + i + ' not open');
     }
@@ -100,6 +103,20 @@ test('m5 regression: A5 phrase stays in 4th position, A5 on 4th finger', functio
     assert.strictEqual(res[5].combo[0][FING], 4, 'A5 = 4th finger');
     assert.strictEqual(res[5].combo[0][STR], 2, 'A5 on the A string');
     assert.strictEqual(res[6].combo[0][FING], 4, 'second A5 = 4th finger');
+    // the D5 = 1 pin declares III; the chain resets and follows it
+    assert.strictEqual(res[11].pos, 3, 'pinned D5 = 1 means 3rd position');
+});
+
+test('manual pin resets the chain: whole measure holds the pinned position', function () {
+    // Same passage without the D5 pin: the E5 = 1 anchor rules until the
+    // next pin (start of m7), so all of m5 and m6 stay in IV - no shift.
+    var noD5 = JSON.parse(JSON.stringify(M5_M7));
+    noD5[11] = [74];
+    var res = core.solveChords(m5m7(noD5), 0, 7);
+    for (var i = 0; i <= 30; i++) {
+        assert.strictEqual(res[i].pos, 4, 'event ' + i + ' in 4th position');
+        assert.notStrictEqual(res[i].combo[0][FING], 0, 'event ' + i + ' not open');
+    }
 });
 
 test('all-open event carries hand position through (no snap to I)', function () {
