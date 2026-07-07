@@ -82,7 +82,11 @@ var W_SEMITONE_SLIDE = 0.5;
 // Same-string finger move reaching beyond the hand frame (~2 semitones
 // per finger step), per excess semitone.
 var W_STRETCH = 0.4;
-var W_OPEN_BONUS = -0.2;
+// Open strings cannot be vibrated and stick out in timbre; prefer a
+// fingered note when one is reachable. Set equal to one adjacent bow
+// crossing: an open string is still chosen when it saves a shift or
+// more than one crossing (fast/complex passages), but not otherwise.
+var W_OPEN = 0.5;
 // Displacing a finger from its key frame. True accidentals pay this on
 // every candidate equally; it mainly discourages a displaced finger when
 // the in-frame finger for the same pitch is available.
@@ -119,7 +123,7 @@ function transitionCost(prev, cur) {
 function localCost(state) {
     var k = state[1], p = state[2], off = state[3];
     var c = 0.0;
-    if (k === 0) c += W_OPEN_BONUS;
+    if (k === 0) c += W_OPEN;
     if (off !== 0) c += W_ACCIDENTAL;
     c += W_LOW_POS * (p - 1);
     return c;
@@ -231,7 +235,7 @@ function chordLocalCost(entry) {
     var positions = [];
     for (var i = 0; i < combo.length; i++) {
         var k = combo[i][1], p = combo[i][2], off = combo[i][3];
-        if (k === 0) c += W_OPEN_BONUS;
+        if (k === 0) c += W_OPEN;
         if (off !== 0) c += W_ACCIDENTAL;
         if (k > 0) positions.push(p);
     }
