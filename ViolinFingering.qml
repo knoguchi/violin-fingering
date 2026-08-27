@@ -17,13 +17,13 @@ import "violin_fingering_core.js" as Core
 
 MuseScore {
     id: plugin
-    version: "1.4.0"
+    version: "1.5.0"
     title: "ViolinFingering"
     description: "Violin fingering (string/finger/position) by dynamic programming. Reads key signature; writes finger numbers and Roman-numeral position marks."
     categoryCode: "composing-arranging-tools"
     pluginType: "dialog"
     width: 420
-    height: 460
+    height: 490
 
     onRun: {
         if (!curScore) {
@@ -52,6 +52,8 @@ MuseScore {
     property string autoColor: "#0065bf"
     property var pluginEls: []     // elements to remove on this run
     property var promotedEls: []   // edited by user: recolor to black
+    property var paintedEls: []    // difficulty-painted noteheads to reset
+    property var tiedExtras: []    // tied continuations: painted, not solved
     property var registry: null
 
     function loadRegistry() {
@@ -110,9 +112,12 @@ MuseScore {
         targetStaff = staffIdx;
         var byTick = {};
         var keyByTick = {};
+        var mTickByTick = {};
         registry = loadRegistry();
         pluginEls = [];
         promotedEls = [];
+        paintedEls = [];
+        tiedExtras = [];
         for (var voice = 0; voice < 4; voice++) {
             cursor.staffIdx = staffIdx;
             cursor.voice = voice;
@@ -138,6 +143,8 @@ MuseScore {
                     if (keyByTick[cursor.tick] === undefined) {
                         try { keyByTick[cursor.tick] = cursor.keySignature; } catch (e0) {}
                     }
+                    var mt = cursor.measure ? cursor.measure.firstSegment.tick : cursor.tick;
+                    if (mTickByTick[cursor.tick] === undefined) mTickByTick[cursor.tick] = mt;
                     // Grace chords are real played notes: give each one a
                     // synthetic tick just before (grace-after: just after)
                     // the main note so it takes its place in the fingering
@@ -155,11 +162,12 @@ MuseScore {
                         var gt = after ? cursor.tick + 1 + gi
                                        : cursor.tick - (nGrace - gi);
                         if (keyByTick[gt] === undefined) keyByTick[gt] = keyByTick[cursor.tick];
+                        if (mTickByTick[gt] === undefined) mTickByTick[gt] = mt;
                         for (var gn = 0; gn < gch.notes.length; gn++)
-                            collectNote(byTick, gch.notes[gn], gt, true);
+                            collectNote(byTick, gch.notes[gn], gt, true, mt);
                     }
                     for (var i = 0; i < el.notes.length; i++)
-                        collectNote(byTick, el.notes[i], cursor.tick, false);
+                        collectNote(byTick, el.notes[i], cursor.tick, false, mt);
                 }
                 cursor.next();
             }
@@ -172,14 +180,34 @@ MuseScore {
                 .sort(function (a, b) { return b.midi - a.midi; });
             events.push({tick: ticks[ti], pitches: pitches,
                          key: keyByTick[ticks[ti]],
+                         mTick: mTickByTick[ticks[ti]],
                          grace: pitches[0].grace || false});
         }
         return events;
     }
 
-    function collectNote(byTick, note, t, grace) {
-        if (note.tieBack) return;
+    function collectNote(byTick, note, t, grace, mt) {
         var p = note.pitch;
+        // Reclaim a difficulty-painted notehead (kind "n" in the registry):
+        // exact color match means it is ours to reset or repaint; any other
+        // color means the user changed it and it is theirs.
+        var hex = ("" + note.color).toLowerCase();
+        if (hex.length >= 7) {
+            var nIdxs = registry.byKey[t + "|" + p + "|n|#" + hex.substr(hex.length - 6)];
+            if (nIdxs) {
+                for (var q = 0; q < nIdxs.length; q++)
+                    if (!registry.consumed[nIdxs[q]]) {
+                        registry.consumed[nIdxs[q]] = true;
+                        paintedEls.push(note);
+                        break;
+                    }
+            }
+        }
+        if (note.tieBack) {
+            // Not part of the fingering chain, but painted with its measure.
+            tiedExtras.push({ref: note, tick: t, midi: p, mTick: mt});
+            return;
+        }
         var ann = readAnnotations(note, t);
         if (!byTick[t]) byTick[t] = {};
         if (byTick[t][p]) {
@@ -302,6 +330,9 @@ MuseScore {
         for (var pr = 0; pr < promotedEls.length; pr++) {
             try { promotedEls[pr].color = "#000000"; } catch (e) {}
         }
+        for (var pn = 0; pn < paintedEls.length; pn++) {
+            try { paintedEls[pn].color = "#000000"; } catch (e5) {}
+        }
         var removed = 0;
         for (var r = 0; r < pluginEls.length; r++) {
             try { removeElement(pluginEls[r]); removed++; } catch (e2) {}
@@ -316,7 +347,7 @@ MuseScore {
     }
 
     // -- write fingering annotations ---------------------
-    function writeAnnotations(events, result) {
+    function writeAnnotations(events, result, measureColors) {
         curScore.startCmd();
         // annotations the user edited are theirs now: recolor to black
         for (var pr = 0; pr < promotedEls.length; pr++) {
@@ -326,6 +357,10 @@ MuseScore {
         for (var r = 0; r < pluginEls.length; r++) {
             try { removeElement(pluginEls[r]); } catch (e) {}
         }
+        // noteheads painted by a previous run go back to black first
+        for (var pn = 0; pn < paintedEls.length; pn++) {
+            try { paintedEls[pn].color = "#000000"; } catch (e5) {}
+        }
         var markerColor = colorize.checked ? autoColor : stealthColor;
         var newItems = [];
         var nFing = 0, nStr = 0, nPos = 0, nSkip = 0;
@@ -333,6 +368,17 @@ MuseScore {
         var cursor = curScore.newCursor();
         cursor.staffIdx = targetStaff; cursor.voice = 0;
         for (var i = 0; i < result.length; i++) {
+            // difficulty paint covers every note, harmonic events included
+            if (measureColors && measureColors[events[i].mTick]) {
+                var mcol = measureColors[events[i].mTick];
+                for (var mj = 0; mj < events[i].pitches.length; mj++) {
+                    var mrefs = events[i].pitches[mj].refs;
+                    for (var mr = 0; mr < mrefs.length; mr++) {
+                        mrefs[mr].color = mcol;
+                        newItems.push([events[i].tick, events[i].pitches[mj].midi, "n", mcol]);
+                    }
+                }
+            }
             var st = result[i];
             if (!st || st.harmonic) { nSkip++; continue; }
             var combo = st.combo, handPos = st.pos;
@@ -386,6 +432,15 @@ MuseScore {
                 nPos++;
             }
         }
+        // tied continuations carry their measure's color too
+        if (measureColors) {
+            for (var tx = 0; tx < tiedExtras.length; tx++) {
+                var tcol = measureColors[tiedExtras[tx].mTick];
+                if (!tcol) continue;
+                tiedExtras[tx].ref.color = tcol;
+                newItems.push([tiedExtras[tx].tick, tiedExtras[tx].midi, "n", tcol]);
+            }
+        }
         // Persist the registry: entries not consumed this run (e.g. outside
         // the selection) survive; consumed ones are replaced by newItems.
         var items = [];
@@ -395,6 +450,19 @@ MuseScore {
         curScore.setMetaTag("violinFingering", JSON.stringify({v: 1, items: items}));
         curScore.endCmd();
         return {fing: nFing, str: nStr, pos: nPos, skip: nSkip};
+    }
+
+    // Green (easy) through amber to red (hard); t in [0, 1].
+    function heatColor(t) {
+        t = Math.max(0, Math.min(1, t));
+        var h = (1 - t) * 120, s = 0.85, v = 0.8;
+        var c = v * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = v - c;
+        var r = h < 60 ? c : x, g = h < 60 ? x : c;
+        var toHex = function (u) {
+            var w = Math.round((u + m) * 255).toString(16);
+            return w.length < 2 ? "0" + w : w;
+        };
+        return "#" + toHex(r) + toHex(g) + toHex(0);
     }
 
     function apply() {
@@ -465,7 +533,31 @@ MuseScore {
                 + "Report issues at https://github.com/knoguchi/violin-fingering/issues";
             return;
         }
-        var stats = writeAnnotations(events, result);
+        // Difficulty contour: left-hand effort along the solved path (taste
+        // terms excluded, transitions scaled by note rate), summed per
+        // measure and normalized to a green-red gradient.
+        var measureColors = null, diffLine = "";
+        if (paintDifficulty.checked) {
+            var ticksArr = events.map(function (e) { return e.tick; });
+            var div = 480;
+            try { if (typeof division !== "undefined" && division > 0) div = division; } catch (e6) {}
+            var eff = Core.effortProfile(result, ticksArr, div);
+            var byMeasure = {};
+            for (var mi = 0; mi < events.length; mi++)
+                byMeasure[events[mi].mTick] = (byMeasure[events[mi].mTick] || 0) + eff[mi];
+            var lo = Infinity, hi = -Infinity, nMeas = 0;
+            for (var mk in byMeasure) {
+                if (byMeasure[mk] < lo) lo = byMeasure[mk];
+                if (byMeasure[mk] > hi) hi = byMeasure[mk];
+                nMeas++;
+            }
+            measureColors = {};
+            for (var mk2 in byMeasure)
+                measureColors[mk2] = heatColor((byMeasure[mk2] - lo) / ((hi - lo) || 1));
+            diffLine = "\nDifficulty: " + nMeas + " measures, effort "
+                + lo.toFixed(1) + " (green) to " + hi.toFixed(1) + " (red)";
+        }
+        var stats = writeAnnotations(events, result, measureColors);
         // Position distribution
         var posDist = {};
         for (var i = 0; i < result.length; i++) {
@@ -482,7 +574,7 @@ MuseScore {
             + "Fingers written: " + stats.fing
             + (writeStrings.checked ? " / strings: " + stats.str : "")
             + (writePositions.checked ? " / positions: " + stats.pos : "")
-            + "\nPosition use: " + posStr;
+            + "\nPosition use: " + posStr + diffLine;
     }
 
     // -- UI ----------------------------------------------
@@ -503,6 +595,7 @@ MuseScore {
         CheckBox { id: writeStrings;   checked: false; text: "Write string numbers (①=E, ②=A, ③=D, ④=G)" }
         CheckBox { id: colorize;       checked: true;  text: "Color auto-written annotations blue" }
         CheckBox { id: overwrite;      checked: false; text: "Replace manual fingerings too (plugin's own are always replaced)" }
+        CheckBox { id: paintDifficulty; checked: false; text: "Color notes by measure difficulty (green = easy, red = hard)" }
         RowLayout {
             Button {
                 text: "Run"
@@ -531,7 +624,7 @@ MuseScore {
             TextEdit {
                 id: statusText
                 width: parent.width
-                text: "v1.4.0 (cost model: positions, spelling, double stops) - Run computes violin fingering and writes annotations; re-running replaces the plugin's own annotations while manual ones are honored as constraints. Clear removes the plugin's annotations. Issues: github.com/knoguchi/violin-fingering"
+                text: "v1.5.0 (difficulty contour) - Run computes violin fingering and writes annotations; re-running replaces the plugin's own annotations while manual ones are honored as constraints. Clear removes the plugin's annotations. Issues: github.com/knoguchi/violin-fingering"
                 wrapMode: TextEdit.Wrap
                 readOnly: true
                 selectByMouse: true

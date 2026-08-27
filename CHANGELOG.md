@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.5.0 (unreleased)
+
+- New: "Color notes by measure difficulty" paints every notehead on a
+  green-to-red contour of per-measure left-hand effort. Effort counts
+  physical work only (shifts, crossings, stretches, displaced fingers) -
+  taste terms like open-string timbre and position preferences are
+  excluded - and transitions are scaled by note rate, so the same shift
+  counts more between sixteenths than between half notes. Tied
+  continuations are painted with their measure; painted colors are
+  tracked in the registry and restored to black on re-run or Clear.
+
 ## 1.4.0 (2026-08-26)
 
 Cost-model revision after a violinist's review of the algorithm:

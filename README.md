@@ -55,6 +55,12 @@ With no selection, the top staff is processed. Repeat per part.
 Checkboxes control which kinds of annotation to write (finger numbers,
 positions, string numbers).
 
+**Color notes by measure difficulty** paints every notehead on a
+green-to-red contour of per-measure left-hand effort (shifts, crossings,
+stretches — scaled by note rate, so fast passages count more). Painted
+colors are tracked like other plugin annotations: re-running repaints and
+Clear restores black. Difficulty is left-hand only; bowing is not rated.
+
 ## Algorithm overview
 - State: (string, finger, position) per note, with accidental offset
 - Candidates for each pitch: enumerated by the key-signature finger layout

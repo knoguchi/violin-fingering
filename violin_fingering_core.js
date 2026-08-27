@@ -197,22 +197,26 @@ function candidatesForEvent(notes, key, maxPosition) {
     return out;
 }
 
-function chordLocalCost(entry) {
+// Local cost split into physical work (effort) and preference (taste).
+// The solver optimizes their sum; difficulty profiling reads effort only,
+// so a passage is not rated "harder" for using an open string or an
+// unfashionable position.
+function chordLocalCostParts(entry) {
     var combo = entry.combo;
-    var c = 0.0;
+    var effort = 0.0, taste = 0.0;
     var positions = [];
     for (var i = 0; i < combo.length; i++) {
         var s = combo[i][0], k = combo[i][1], p = combo[i][2], off = combo[i][3];
-        if (k === 0) c += W_OPEN[s];
-        if (off !== 0) c += W_ACCIDENTAL;
-        if (combo[i][5]) c += W_SPELL;
+        if (k === 0) taste += W_OPEN[s];
+        if (off !== 0) effort += W_ACCIDENTAL;
+        if (combo[i][5]) taste += W_SPELL;
         if (k > 0) {
             positions.push(p);
-            c += W_ALT_LOW_STRING * (p - 1) * (3 - s);
+            effort += W_ALT_LOW_STRING * (p - 1) * (3 - s);
         }
     }
     // Open-only events have no real hand placement; their pos is virtual.
-    if (!entry.openOnly) c += posCost(entry.pos);
+    if (!entry.openOnly) taste += posCost(entry.pos);
     // Penalize position span across fingered strings (hand shape contortion).
     // Different fingers per se are not a cost; only the position spread is.
     if (positions.length >= 2) {
@@ -221,9 +225,42 @@ function chordLocalCost(entry) {
             if (positions[z] < mn) mn = positions[z];
             if (positions[z] > mx) mx = positions[z];
         }
-        c += 0.5 * (mx - mn);
+        effort += 0.5 * (mx - mn);
     }
-    return c;
+    return {effort: effort, taste: taste};
+}
+
+function chordLocalCost(entry) {
+    var parts = chordLocalCostParts(entry);
+    return parts.effort + parts.taste;
+}
+
+// Left-hand effort per event along a solved path: physical work only
+// (shifts, crossings, stretches, displaced fingers); taste terms (open
+// timbre, position vocabulary, spelling) are excluded, so a passage is
+// not rated harder for using an open string. Entries align with the
+// path; events without a combo (harmonics) contribute 0.
+// With onset ticks and the tick division (ticks per quarter) given,
+// transition effort scales with note rate - the same shift is harder
+// between sixteenths than between half notes: difficulty comes from
+// time. The factor is clamped so extremes stay comparable.
+function effortProfile(path, ticks, division) {
+    var out = [];
+    for (var i = 0; i < path.length; i++) {
+        if (!path[i] || !path[i].combo) { out.push(0); continue; }
+        var e = chordLocalCostParts(path[i]).effort;
+        if (i > 0 && path[i - 1] && path[i - 1].combo) {
+            var trans = chordTransCost(path[i - 1], path[i]);
+            if (ticks && division) {
+                var gap = ticks[i] - ticks[i - 1];
+                if (gap > 0)
+                    trans *= Math.max(0.5, Math.min(3, division / gap));
+            }
+            e += trans;
+        }
+        out.push(e);
+    }
+    return out;
 }
 
 function chordTransCost(prev, cur) {

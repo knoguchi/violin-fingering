@@ -188,6 +188,34 @@ test('spelling picks the displaced finger: sharp raised, flat lowered', function
     assert.strictEqual(flat[0].combo[0][OFF], -1, 'Gb = lowered finger');
 });
 
+test('effortProfile: taste terms excluded, shifts show as spikes', function () {
+    // An open string costs preference (timbre), not work: zero effort.
+    var open = core.solveChords([{pitches: [{pitch: 76, finger: 0}]}], 0, 7);
+    assert.strictEqual(core.effortProfile(open)[0], 0, 'open E is effortless');
+    // E5 pinned f1 (IV) then C5 pinned f2 (I) on the A string: the
+    // profile's second entry carries the IV->I shift (2.5 + 3*3 = 11.5).
+    var res = core.solveChords([
+        {pitches: [{pitch: 76, finger: 1, string: 2}]},
+        {pitches: [{pitch: 72, finger: 2, string: 2}]}
+    ], 0, 7);
+    var eff = core.effortProfile(res);
+    assert.ok(eff[0] < 0.2, 'first event nearly effortless');
+    assert.ok(eff[1] >= 11.5 && eff[1] < 12.5, 'shift dominates the second event');
+});
+
+test('effortProfile: the same shift counts more between fast notes', function () {
+    var events = [
+        {pitches: [{pitch: 76, finger: 1, string: 2}]},
+        {pitches: [{pitch: 72, finger: 2, string: 2}]}
+    ];
+    var res = core.solveChords(events, 0, 7);
+    var slow = core.effortProfile(res, [0, 960], 480);   // half notes
+    var fast = core.effortProfile(res, [0, 120], 480);   // sixteenths
+    assert.ok(fast[1] > slow[1], 'sixteenth-note shift is harder');
+    assert.strictEqual(slow[1], 11.5 * 0.5, 'half-note gap discounts');
+    assert.strictEqual(fast[1], 11.5 * 3, 'sixteenth gap amplifies (clamped)');
+});
+
 test('per-event key override: F#5 is in frame after a key change to D major', function () {
     // Piece-level key is C major, but the event carries key=2 (a mid-piece
     // signature change to D major): F#5 must be a plain in-frame finger,
