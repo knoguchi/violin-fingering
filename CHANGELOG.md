@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.5.0 (unreleased)
+## 1.5.0 (2026-08-26)
 
 - Staff selector: the dialog lists every staff by part name; Run and
   Clear process exactly the chosen staff (defaulting to the selection's
