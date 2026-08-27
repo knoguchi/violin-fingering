@@ -1,2 +1,5 @@
 *.zip
 .DS_Store
+*.mscz
+*.musicxml
+node_modules/
