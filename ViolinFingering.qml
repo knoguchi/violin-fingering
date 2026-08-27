@@ -138,24 +138,28 @@ MuseScore {
                     if (keyByTick[cursor.tick] === undefined) {
                         try { keyByTick[cursor.tick] = cursor.keySignature; } catch (e0) {}
                     }
-                    for (var i = 0; i < el.notes.length; i++) {
-                        var note = el.notes[i];
-                        if (note.tieBack) continue;
-                        var p = note.pitch;
-                        var ann = readAnnotations(note, cursor.tick);
-                        var t = cursor.tick;
-                        if (!byTick[t]) byTick[t] = {};
-                        if (byTick[t][p]) {
-                            byTick[t][p].refs.push(note);
-                            if (byTick[t][p].string === null) byTick[t][p].string = ann.string;
-                            if (byTick[t][p].finger === null) byTick[t][p].finger = ann.finger;
-                            if (ann.harmonic) byTick[t][p].harmonic = true;
-                        } else {
-                            byTick[t][p] = {midi: p, string: ann.string, finger: ann.finger,
-                                            harmonic: ann.harmonic, refs: [note],
-                                            spell: spellOf(note)};
-                        }
+                    // Grace chords are real played notes: give each one a
+                    // synthetic tick just before (grace-after: just after)
+                    // the main note so it takes its place in the fingering
+                    // chain. Offsets of a few ticks cannot collide with
+                    // real onsets (the shortest duration is 15 ticks).
+                    var graces = el.graceNotes;
+                    var nGrace = graces ? graces.length : 0;
+                    for (var gi = 0; gi < nGrace; gi++) {
+                        var gch = graces[gi];
+                        var after = false;
+                        try {
+                            after = gch.notes.length > 0
+                                && gch.notes[0].noteType >= NoteType.GRACE8_AFTER;
+                        } catch (e1) {}
+                        var gt = after ? cursor.tick + 1 + gi
+                                       : cursor.tick - (nGrace - gi);
+                        if (keyByTick[gt] === undefined) keyByTick[gt] = keyByTick[cursor.tick];
+                        for (var gn = 0; gn < gch.notes.length; gn++)
+                            collectNote(byTick, gch.notes[gn], gt, true);
                     }
+                    for (var i = 0; i < el.notes.length; i++)
+                        collectNote(byTick, el.notes[i], cursor.tick, false);
                 }
                 cursor.next();
             }
@@ -167,9 +171,27 @@ MuseScore {
                 .map(function (k) { return byTick[ticks[ti]][k]; })
                 .sort(function (a, b) { return b.midi - a.midi; });
             events.push({tick: ticks[ti], pitches: pitches,
-                         key: keyByTick[ticks[ti]]});
+                         key: keyByTick[ticks[ti]],
+                         grace: pitches[0].grace || false});
         }
         return events;
+    }
+
+    function collectNote(byTick, note, t, grace) {
+        if (note.tieBack) return;
+        var p = note.pitch;
+        var ann = readAnnotations(note, t);
+        if (!byTick[t]) byTick[t] = {};
+        if (byTick[t][p]) {
+            byTick[t][p].refs.push(note);
+            if (byTick[t][p].string === null) byTick[t][p].string = ann.string;
+            if (byTick[t][p].finger === null) byTick[t][p].finger = ann.finger;
+            if (ann.harmonic) byTick[t][p].harmonic = true;
+        } else {
+            byTick[t][p] = {midi: p, string: ann.string, finger: ann.finger,
+                            harmonic: ann.harmonic, refs: [note],
+                            spell: spellOf(note), grace: !!grace};
+        }
     }
 
     // Spelling from MuseScore's tonal pitch class: tpc 13-19 are naturals,
@@ -350,8 +372,10 @@ MuseScore {
                     nStr++;
                 }
             }
-            // position mark once per hand-position change
-            if (writePositions.checked && handPos !== prevPos) {
+            // position mark once per hand-position change; grace events
+            // have synthetic ticks that don't exist as segments, so the
+            // mark waits for the main note that carries the position
+            if (writePositions.checked && handPos !== prevPos && !events[i].grace) {
                 cursor.rewindToTick(events[i].tick);
                 var stx = newElement(Element.STAFF_TEXT);
                 stx.text = Core.ROMAN[handPos];

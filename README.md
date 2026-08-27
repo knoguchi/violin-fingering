@@ -84,8 +84,8 @@ positions, string numbers).
   their string while later notes are solved
 - Unison double stops (two noteheads on the same pitch) are merged into a
   single note
-- Grace notes and ornaments are not seen by the solver (a trilled note may
-  get finger 4)
+- Trills and ornament symbols are not seen by the solver (a trilled note
+  may get finger 4); grace notes written as small notes are fingered
 - The fingering optimizes for playability ("can be played"), not for
   expressive choices like timbre or string color, which experienced
   violinists would make manually

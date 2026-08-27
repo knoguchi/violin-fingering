@@ -20,6 +20,10 @@ Cost-model revision after a violinist's review of the algorithm:
   raised lower finger, a flat a lowered upper finger.
 - Dialog text follows the application theme (was hardcoded black,
   unreadable in dark mode).
+- Grace notes join the fingering chain in playing order (before the main
+  note; grace-after notes after it) and get finger numbers; an ornament's
+  pitch now influences the main note's fingering. Position marks stay on
+  the main notes.
 
 ## 1.3.0 (2026-08-26)
 
