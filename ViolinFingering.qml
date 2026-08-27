@@ -23,27 +23,66 @@ MuseScore {
     categoryCode: "composing-arranging-tools"
     pluginType: "dialog"
     width: 420
-    height: 460
+    height: 500
 
     onRun: {
         if (!curScore) {
             statusText.text = "No score is open";
+            return;
         }
+        staffModel = buildStaffModel();
+        // default the dropdown to the selection's staff, if there is one
+        var c = curScore.newCursor();
+        c.rewind(Cursor.SELECTION_START);
+        var defStaff = c.segment ? c.staffIdx : 0;
+        for (var i = 0; i < staffModel.length; i++)
+            if (staffModel[i].staff === defStaff) { staffSelect.currentIndex = i; break; }
     }
 
-    // Staff the selection is on (0 when running on the whole score);
-    // annotations are read from and written to this staff.
+    // The staff being processed: chosen in the dialog's staff dropdown.
+    // One staff at a time; a selection only narrows the tick range.
     property int targetStaff: 0
+    property var staffModel: []
+
+    // One dropdown entry per staff, labeled with its part name.
+    function buildStaffModel() {
+        var m = [];
+        if (!curScore) return m;
+        try {
+            var parts = curScore.parts;
+            for (var pi = 0; pi < parts.length; pi++) {
+                var part = parts[pi];
+                var base = Math.floor(part.startTrack / 4);
+                var nSt = Math.max(1, Math.round((part.endTrack - part.startTrack) / 4));
+                var name = ("" + (part.partName || part.longName || "Staff")).trim();
+                for (var si = 0; si < nSt; si++)
+                    m.push({text: (base + si + 1) + ": " + name
+                                  + (nSt > 1 ? " (staff " + (si + 1) + ")" : ""),
+                            staff: base + si, partIndex: pi});
+            }
+        } catch (e) {}
+        if (!m.length) {
+            var n = 0;
+            try { n = curScore.nstaves; } catch (e2) {}
+            for (var s = 0; s < Math.max(1, n); s++)
+                m.push({text: "Staff " + (s + 1), staff: s, partIndex: -1});
+        }
+        return m;
+    }
 
     // -- ownership of plugin-written annotations ----------
     // Everything the plugin writes is recorded in a score meta tag
-    // ("violinFingering": JSON {v, items: [[tick, pitch, kind, text], ...]},
-    // kind "f"=finger, "s"=string, "p"=position mark, pitch -1 for staff
-    // text) and tinted with markerColor. On re-run, annotations matching
-    // their registry entry are removed and regenerated; a plugin-written
-    // text the user has edited no longer matches and is promoted to a
-    // user constraint. Marker-colored elements with no registry slot
-    // (registry lost or ticks shifted) fall back to plugin-owned.
+    // ("violinFingering": JSON {v: 2, items: [[tick, pitch, kind, text,
+    // staff], ...]}, kind "f"=finger, "s"=string, "p"=position mark,
+    // pitch -1 for staff text) and tinted with markerColor. On re-run,
+    // annotations matching their registry entry are removed and
+    // regenerated; a plugin-written text the user has edited no longer
+    // matches and is promoted to a user constraint. Marker-colored
+    // elements with no registry slot (registry lost or ticks shifted)
+    // fall back to plugin-owned.
+    // v2 keys include the staff so that two staves sharing tick and pitch
+    // (quartet unisons) cannot consume each other's entries; v1 items
+    // (no staff) are matched staff-blind until rewritten.
     // Plugin annotations are written in autoColor (visible blue) or, when
     // colorize is unchecked, stealthColor (near-black); both are
     // recognized as plugin-owned. Promoted (user-edited) elements are
@@ -55,17 +94,25 @@ MuseScore {
     property var registry: null
 
     function loadRegistry() {
-        var reg = {items: [], consumed: [], byKey: {}, byKind: {}};
+        var reg = {items: [], consumed: [], byKey: {}, byKind: {},
+                   legacyByKey: {}, legacyByKind: {}};
         try {
             var raw = curScore.metaTag("violinFingering");
             if (raw) reg.items = JSON.parse(raw).items || [];
         } catch (e) { reg.items = []; }
         for (var i = 0; i < reg.items.length; i++) {
             var it = reg.items[i];
-            var key = it[0] + "|" + it[1] + "|" + it[2] + "|" + it[3];
-            if (!reg.byKey[key]) reg.byKey[key] = [];
-            reg.byKey[key].push(i);
-            reg.byKind[it[0] + "|" + it[1] + "|" + it[2]] = true;
+            if (it.length >= 5) {
+                var key = it[4] + "|" + it[0] + "|" + it[1] + "|" + it[2] + "|" + it[3];
+                if (!reg.byKey[key]) reg.byKey[key] = [];
+                reg.byKey[key].push(i);
+                reg.byKind[it[4] + "|" + it[0] + "|" + it[1] + "|" + it[2]] = true;
+            } else {
+                var lkey = it[0] + "|" + it[1] + "|" + it[2] + "|" + it[3];
+                if (!reg.legacyByKey[lkey]) reg.legacyByKey[lkey] = [];
+                reg.legacyByKey[lkey].push(i);
+                reg.legacyByKind[it[0] + "|" + it[1] + "|" + it[2]] = true;
+            }
             reg.consumed.push(false);
         }
         return reg;
@@ -80,14 +127,16 @@ MuseScore {
 
     // "plugin" = remove and regenerate; "human" = honor as constraint.
     function classifyAnnotation(reg, el, tick, pitch, kind, text) {
-        var idxs = reg.byKey[tick + "|" + pitch + "|" + kind + "|" + text];
+        var idxs = reg.byKey[targetStaff + "|" + tick + "|" + pitch + "|" + kind + "|" + text]
+                || reg.legacyByKey[tick + "|" + pitch + "|" + kind + "|" + text];
         if (idxs) {
             for (var i = 0; i < idxs.length; i++)
                 if (!reg.consumed[idxs[i]]) { reg.consumed[idxs[i]] = true; return "plugin"; }
         }
         if (isMarkerColored(el)) {
             // registered slot with different text = user edited it
-            if (reg.byKind[tick + "|" + pitch + "|" + kind]) {
+            if (reg.byKind[targetStaff + "|" + tick + "|" + pitch + "|" + kind]
+                    || reg.legacyByKind[tick + "|" + pitch + "|" + kind]) {
                 promotedEls.push(el);
                 return "human";
             }
@@ -98,11 +147,14 @@ MuseScore {
 
     // -- score scanning ----------------------------------
     function collectEvents() {
+        // Staff comes from the dropdown; a range selection only narrows
+        // the tick window (whatever staff it was made on).
+        var staffIdx = staffModel.length
+            ? staffModel[Math.max(0, staffSelect.currentIndex)].staff : 0;
         var cursor = curScore.newCursor();
         cursor.rewind(Cursor.SELECTION_START);
-        var staffIdx = 0, endTick = -1;
+        var endTick = -1;
         if (cursor.segment) {
-            staffIdx = cursor.staffIdx;
             var c2 = curScore.newCursor();
             c2.rewind(Cursor.SELECTION_END);
             endTick = c2.tick === 0 ? curScore.lastSegment.tick + 1 : c2.tick;
@@ -309,7 +361,7 @@ MuseScore {
         var items = [];
         for (var q = 0; q < registry.items.length; q++)
             if (!registry.consumed[q]) items.push(registry.items[q]);
-        curScore.setMetaTag("violinFingering", JSON.stringify({v: 1, items: items}));
+        curScore.setMetaTag("violinFingering", JSON.stringify({v: 2, items: items}));
         curScore.endCmd();
         statusText.text = "Cleared " + removed + " plugin annotation" + (removed === 1 ? "" : "s")
             + (items.length ? " (" + items.length + " outside the selection kept)" : "");
@@ -349,7 +401,7 @@ MuseScore {
                     fing.text = "" + k;
                     fing.color = markerColor;
                     noteRefs[0].add(fing);
-                    newItems.push([events[i].tick, pitchInfo.midi, "f", "" + k]);
+                    newItems.push([events[i].tick, pitchInfo.midi, "f", "" + k, targetStaff]);
                     nFing++;
                 }
                 if (writeStrings.checked && !hadString) {
@@ -368,7 +420,7 @@ MuseScore {
                                      : ["①","②","③","④"][stringNum - 1];
                     sn.color = markerColor;
                     noteRefs[0].add(sn);
-                    newItems.push([events[i].tick, pitchInfo.midi, "s", sn.text]);
+                    newItems.push([events[i].tick, pitchInfo.midi, "s", sn.text, targetStaff]);
                     nStr++;
                 }
             }
@@ -381,7 +433,7 @@ MuseScore {
                 stx.text = Core.ROMAN[handPos];
                 stx.color = markerColor;
                 cursor.add(stx);
-                newItems.push([events[i].tick, -1, "p", stx.text]);
+                newItems.push([events[i].tick, -1, "p", stx.text, targetStaff]);
                 prevPos = handPos;
                 nPos++;
             }
@@ -392,7 +444,7 @@ MuseScore {
         for (var q = 0; q < registry.items.length; q++)
             if (!registry.consumed[q]) items.push(registry.items[q]);
         items = items.concat(newItems);
-        curScore.setMetaTag("violinFingering", JSON.stringify({v: 1, items: items}));
+        curScore.setMetaTag("violinFingering", JSON.stringify({v: 2, items: items}));
         curScore.endCmd();
         return {fing: nFing, str: nStr, pos: nPos, skip: nSkip};
     }
@@ -497,6 +549,19 @@ MuseScore {
             // palette so it stays readable in dark mode.
             color: writeFingers.palette.windowText
             text: "Computes violin fingering for the selection (or whole score) and writes finger numbers and position marks as annotations.\nExisting finger/string annotations are honored as constraints."
+        }
+        RowLayout {
+            Layout.fillWidth: true
+            Text {
+                text: "Staff:"
+                color: writeFingers.palette.windowText
+            }
+            ComboBox {
+                id: staffSelect
+                Layout.fillWidth: true
+                model: staffModel
+                textRole: "text"
+            }
         }
         CheckBox { id: writeFingers;   checked: true;  text: "Write left-hand finger numbers (1-4)" }
         CheckBox { id: writePositions; checked: true;  text: "Write positions (Roman numerals)" }
