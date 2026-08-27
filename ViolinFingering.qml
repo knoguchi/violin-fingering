@@ -469,6 +469,9 @@ MuseScore {
         Text {
             Layout.fillWidth: true
             wrapMode: Text.Wrap
+            // Plain Text defaults to black; follow the themed Controls
+            // palette so it stays readable in dark mode.
+            color: writeFingers.palette.windowText
             text: "Computes violin fingering for the selection (or whole score) and writes finger numbers and position marks as annotations.\nExisting finger/string annotations are honored as constraints."
         }
         CheckBox { id: writeFingers;   checked: true;  text: "Write left-hand finger numbers (1-4)" }
@@ -508,7 +511,7 @@ MuseScore {
                 wrapMode: TextEdit.Wrap
                 readOnly: true
                 selectByMouse: true
-                color: "black"
+                color: writeFingers.palette.windowText
             }
         }
     }

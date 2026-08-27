@@ -18,6 +18,8 @@ Cost-model revision after a violinist's review of the algorithm:
   around the instrument's shoulder).
 - Enharmonic spelling (from tpc) breaks displacement ties: a sharp is a
   raised lower finger, a flat a lowered upper finger.
+- Dialog text follows the application theme (was hardcoded black,
+  unreadable in dark mode).
 
 ## 1.3.0 (2026-08-26)
 
