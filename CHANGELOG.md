@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.4.0 (unreleased)
+## 1.4.0 (2026-08-26)
 
 Cost-model revision after a violinist's review of the algorithm:
 
