@@ -11,7 +11,7 @@ const src = fs
 
 module.exports = new Function(src + `
 return {keyScale: keyScale, fingerPitch: fingerPitch,
-        candidatesForPitch: candidatesForPitch, solve: solve,
+        candidatesForPitch: candidatesForPitch,
         candidatesForEvent: candidatesForEvent, solveChords: solveChords,
         ROMAN: ROMAN, STRING_NAMES: STRING_NAMES, TUNING: TUNING};
 `)();

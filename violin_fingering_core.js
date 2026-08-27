@@ -95,78 +95,6 @@ var W_LOW_POS = 0.05;
 // Shifting while an open string sounds hides the slide.
 var OPEN_SHIFT_DISCOUNT = 0.5;
 
-function transitionCost(prev, cur) {
-    var s1 = prev[0], k1 = prev[1], p1 = prev[2];
-    var s2 = cur[0],  k2 = cur[1],  p2 = cur[2];
-    var ep1 = k1 > 0 ? p1 : p2;
-    var ep2 = k2 > 0 ? p2 : p1;
-    var c = 0.0;
-    if (ep1 !== ep2) c += W_POS_FIXED + W_POS_SHIFT * Math.abs(ep1 - ep2);
-    if (s1 !== s2) {
-        c += W_CROSS[Math.min(Math.abs(s1 - s2), 3)];
-        if (k1 > 0 && k1 === k2) {
-            // Barre = same physical spot on adjacent strings (perfect fifth),
-            // regardless of how the key frame labels the two notes.
-            var barre = Math.abs(s1 - s2) === 1
-                && prev[4] - TUNING[s1] === cur[4] - TUNING[s2];
-            c += barre ? W_BARRE : W_SAME_FINGER_CROSS;
-        }
-    }
-    else if (k1 !== k2 && k1 > 0 && k2 > 0) {
-        var stretch = Math.abs(prev[4] - cur[4]) - 2 * Math.abs(k1 - k2);
-        if (stretch > 0) c += W_STRETCH * stretch;
-    }
-    else if (k1 === k2 && k1 > 0 && prev[3] !== cur[3]) c += W_SEMITONE_SLIDE;
-    return c;
-}
-
-function localCost(state) {
-    var k = state[1], p = state[2], off = state[3];
-    var c = 0.0;
-    if (k === 0) c += W_OPEN;
-    if (off !== 0) c += W_ACCIDENTAL;
-    c += W_LOW_POS * (p - 1);
-    return c;
-}
-
-// Solve a sequence of single-note events. Each event = {pitch: midi}.
-// Returns [[s, k, p, off], ...] or null if unplayable.
-function solve(events, key, maxPosition) {
-    if (!events.length) return [];
-    var layers = [];
-    for (var i = 0; i < events.length; i++) {
-        var c = candidatesForPitch(events[i].pitch, key, maxPosition);
-        if (!c.length) return null;
-        layers.push(c);
-    }
-    var n = events.length;
-    var cost = [layers[0].map(localCost)];
-    var back = [layers[0].map(function () { return -1; })];
-    for (var t = 1; t < n; t++) {
-        var ct = [], bt = [];
-        for (var j = 0; j < layers[t].length; j++) {
-            var st = layers[t][j];
-            var lc = localCost(st);
-            var best = Infinity, bestK = -1;
-            for (var k2 = 0; k2 < layers[t - 1].length; k2++) {
-                var cand = cost[t - 1][k2] + transitionCost(layers[t - 1][k2], st) + lc;
-                if (cand < best) { best = cand; bestK = k2; }
-            }
-            ct.push(best); bt.push(bestK);
-        }
-        cost.push(ct); back.push(bt);
-    }
-    var jb = 0;
-    for (var jj = 1; jj < cost[n - 1].length; jj++)
-        if (cost[n - 1][jj] < cost[n - 1][jb]) jb = jj;
-    var path = new Array(n);
-    for (var tt = n - 1; tt >= 0; tt--) {
-        path[tt] = layers[tt][jb];
-        jb = back[tt][jb];
-    }
-    return path;
-}
-
 // --- chord-aware (multi-note per event) ---------------
 
 var CHORD_POS_SPAN = 1;
@@ -297,6 +225,8 @@ function chordTransCost(prev, cur) {
 }
 
 // Solve chord events. Each event = {pitches: [{pitch, string?, finger?}, ...]}
+// with an optional per-event key override (mid-piece key signature changes);
+// events without one use the piece-level key argument.
 // Returns aligned list of {combo, pos} or null.
 //
 // A manually noted finger is a reset: the player has declared where the
@@ -327,7 +257,8 @@ function solveChordSeg(events, key, maxPosition) {
     if (!events.length) return [];
     var layers = [];
     for (var i = 0; i < events.length; i++) {
-        var combos = candidatesForEvent(events[i].pitches, key, maxPosition);
+        var evKey = events[i].key != null ? events[i].key : key;
+        var combos = candidatesForEvent(events[i].pitches, evKey, maxPosition);
         if (!combos.length) return null;
         layers.push(combos);
     }

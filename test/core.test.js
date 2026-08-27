@@ -130,3 +130,15 @@ test('all-open event carries hand position through (no snap to I)', function () 
 test('unplayable input returns null', function () {
     assert.strictEqual(core.solveChords(melody([40]), 0, 7), null);
 });
+
+test('per-event key override: F#5 is in frame after a key change to D major', function () {
+    // Piece-level key is C major, but the event carries key=2 (a mid-piece
+    // signature change to D major): F#5 must be a plain in-frame finger,
+    // not a displaced (accidental) one.
+    var res = core.solveChords([{pitches: [{pitch: 78}], key: 2}], 0, 7);
+    assert.strictEqual(res[0].combo[0][OFF], 0, 'F#5 in frame under D major');
+    // Same note without the override, under C major: F# is not a scale
+    // tone, so it can only be played as a displaced finger.
+    var res2 = core.solveChords(melody([78]), 0, 7);
+    assert.notStrictEqual(res2[0].combo[0][OFF], 0, 'F#5 displaced under C major');
+});

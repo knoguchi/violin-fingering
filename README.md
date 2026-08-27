@@ -34,6 +34,10 @@ Annotated by the plugin:
 3. Open a violin score and run the plugin from the Plugins menu.
 
 ## Usage
+In a multi-part score, the selection picks the part: select a range on the
+staff you want fingered (e.g. Violin 2) and Run works on that staff only.
+With no selection, the top staff is processed. Repeat per part.
+
 - **Run**: computes fingering for the selection (or the whole score) and writes
   finger numbers and position marks as annotations on the staff.
   Re-running (e.g. after a plugin update) replaces the plugin's own previous

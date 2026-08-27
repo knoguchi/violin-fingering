@@ -17,7 +17,7 @@ import "violin_fingering_core.js" as Core
 
 MuseScore {
     id: plugin
-    version: "1.2.0"
+    version: "1.3.0"
     title: "ViolinFingering"
     description: "Violin fingering (string/finger/position) by dynamic programming. Reads key signature; writes finger numbers and Roman-numeral position marks."
     categoryCode: "composing-arranging-tools"
@@ -31,10 +31,9 @@ MuseScore {
         }
     }
 
-    property var voiceCounts: [0, 0, 0, 0]
-    property var voiceEvents: [[], [], [], []]
-    property var trace: []
-    function tlog(s) { trace.push(s); console.log("[ViolinFingering] " + s); }
+    // Staff the selection is on (0 when running on the whole score);
+    // annotations are read from and written to this staff.
+    property int targetStaff: 0
 
     // -- ownership of plugin-written annotations ----------
     // Everything the plugin writes is recorded in a score meta tag
@@ -108,9 +107,9 @@ MuseScore {
             c2.rewind(Cursor.SELECTION_END);
             endTick = c2.tick === 0 ? curScore.lastSegment.tick + 1 : c2.tick;
         }
+        targetStaff = staffIdx;
         var byTick = {};
-        voiceCounts = [0, 0, 0, 0];
-        voiceEvents = [[], [], [], []];
+        var keyByTick = {};
         registry = loadRegistry();
         pluginEls = [];
         promotedEls = [];
@@ -135,29 +134,13 @@ MuseScore {
                     }
                 }
                 var el = cursor.element;
-                if (el && el.type === Element.REST) {
-                    voiceEvents[voice].push({tick: cursor.tick, rest: true,
-                        mTick: cursor.measure ? cursor.measure.firstSegment.tick : -1,
-                        dur: el.duration
-                             ? {num: el.duration.numerator, den: el.duration.denominator}
-                             : {num: 1, den: 4}});
-                }
                 if (el && el.type === Element.CHORD) {
-                    var t0 = cursor.tick;
-                    var vEv = {tick: t0, pitches: [], ties: [],
-                               mTick: cursor.measure ? cursor.measure.firstSegment.tick : -1,
-                               dur: el.duration
-                                    ? {num: el.duration.numerator, den: el.duration.denominator}
-                                    : {num: 1, den: 4}};
-                    for (var i0 = 0; i0 < el.notes.length; i0++) {
-                        vEv.pitches.push(el.notes[i0].pitch);
-                        if (el.notes[i0].tieBack) vEv.ties.push(el.notes[i0].pitch);
+                    if (keyByTick[cursor.tick] === undefined) {
+                        try { keyByTick[cursor.tick] = cursor.keySignature; } catch (e0) {}
                     }
-                    voiceEvents[voice].push(vEv);
                     for (var i = 0; i < el.notes.length; i++) {
                         var note = el.notes[i];
                         if (note.tieBack) continue;
-                        voiceCounts[voice]++;
                         var p = note.pitch;
                         var ann = readAnnotations(note, cursor.tick);
                         var t = cursor.tick;
@@ -182,7 +165,8 @@ MuseScore {
             var pitches = Object.keys(byTick[ticks[ti]])
                 .map(function (k) { return byTick[ticks[ti]][k]; })
                 .sort(function (a, b) { return b.midi - a.midi; });
-            events.push({tick: ticks[ti], pitches: pitches});
+            events.push({tick: ticks[ti], pitches: pitches,
+                         key: keyByTick[ticks[ti]]});
         }
         return events;
     }
@@ -255,9 +239,9 @@ MuseScore {
     // sharp count (+) / flat count (-) on KeySig elements.
     function readKeySignature() {
         var c = curScore.newCursor();
-        c.staffIdx = 0; c.voice = 0;
+        c.staffIdx = targetStaff; c.voice = 0;
         c.rewind(Cursor.SCORE_START);
-        c.staffIdx = 0; c.voice = 0;
+        c.staffIdx = targetStaff; c.voice = 0;
         // The key signature is associated with segments. Try to read from
         // the first measure's KeySig if present; default to 0 (C major).
         var key = 0;
@@ -312,7 +296,7 @@ MuseScore {
         var nFing = 0, nStr = 0, nPos = 0, nSkip = 0;
         var prevPos = -1;
         var cursor = curScore.newCursor();
-        cursor.staffIdx = 0; cursor.voice = 0;
+        cursor.staffIdx = targetStaff; cursor.voice = 0;
         for (var i = 0; i < result.length; i++) {
             var st = result[i];
             if (!st || st.harmonic) { nSkip++; continue; }
@@ -377,7 +361,6 @@ MuseScore {
     }
 
     function apply() {
-        trace = [];
         var events = collectEvents();
         if (events.length === 0) { statusText.text = "No notes found"; return; }
         var key = readKeySignature();
@@ -391,6 +374,7 @@ MuseScore {
                     return {pitch: p.midi, string: p.string, finger: p.finger,
                             harmonic: p.harmonic || false};
                 }),
+                key: e.key,   // key signature in effect at this tick
                 isHarmonic: hasHarmonic
             };
         });
@@ -507,7 +491,7 @@ MuseScore {
             TextEdit {
                 id: statusText
                 width: parent.width
-                text: "v1.2.0 (open strings penalized) - Run computes violin fingering and writes annotations; re-running replaces the plugin's own annotations while manual ones are honored as constraints. Clear removes the plugin's annotations. Issues: github.com/knoguchi/violin-fingering"
+                text: "v1.3.0 (selection staff + mid-piece key changes) - Run computes violin fingering and writes annotations; re-running replaces the plugin's own annotations while manual ones are honored as constraints. Clear removes the plugin's annotations. Issues: github.com/knoguchi/violin-fingering"
                 wrapMode: TextEdit.Wrap
                 readOnly: true
                 selectByMouse: true
