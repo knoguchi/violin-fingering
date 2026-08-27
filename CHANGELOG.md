@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.3.0 (unreleased)
+## 1.3.0 (2026-08-26)
 
 - A manually noted finger now resets the Viterbi chain: each segment between
   pins is solved independently, so downstream context can no longer drag
