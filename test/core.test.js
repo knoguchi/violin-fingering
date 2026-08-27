@@ -131,6 +131,63 @@ test('unplayable input returns null', function () {
     assert.strictEqual(core.solveChords(melody([40]), 0, 7), null);
 });
 
+test('shift cost does not include stretch or slide taxes', function () {
+    // B4 (A string, f1, I) -> A5 (A string, IV): the pure shift is
+    // W_POS_FIXED + 3 * W_POS_SHIFT = 11.5 whatever finger the hand lands
+    // on. The stretch/slide terms describe reaches within a frame; once
+    // the hand shifts they must not fire (they used to tax every
+    // cross-finger shift landing, biasing toward same-finger shifts).
+    var st = function (s, k, p, off, pitch) {
+        return {combo: [[s, k, p, off, pitch]], pos: p, openOnly: false};
+    };
+    var from = st(2, 1, 1, 0, 71);
+    assert.strictEqual(core.chordTransCost(from, st(2, 4, 4, 0, 81)), 11.5,
+        'landing on f4');
+    assert.strictEqual(core.chordTransCost(from, st(2, 2, 4, 0, 77)), 11.5,
+        'landing on f2');
+    assert.strictEqual(core.chordTransCost(from, st(2, 1, 4, 1, 77)), 11.5,
+        'landing on a displaced f1');
+});
+
+test('double stops sit on adjacent strings; tenths are playable', function () {
+    // G4+B5, a major tenth: must come out on adjacent strings (D+A) with
+    // fingers 1 and 4 spanning two positions - never on D+E with the
+    // silent A string in the middle, which cannot be bowed.
+    var res = core.solveChords([{pitches: [{pitch: 83}, {pitch: 67}]}], 0, 7);
+    var s1 = res[0].combo[0][STR], s2 = res[0].combo[1][STR];
+    assert.strictEqual(Math.abs(s1 - s2), 1, 'adjacent strings');
+    var fingers = [res[0].combo[0][FING], res[0].combo[1][FING]].sort();
+    assert.deepStrictEqual(fingers, [1, 4], 'fingered 1 and 4');
+});
+
+test('open G + A4: the A must be fingered on the D string', function () {
+    // Bowing the G and A strings together while skipping the D is
+    // impossible, so the open-A candidate is excluded and A4 lands as a
+    // fingered note on the D string next door.
+    var res = core.solveChords([{pitches: [{pitch: 69}, {pitch: 55}]}], 0, 7);
+    var strings = res[0].combo.map(function (c) { return c[STR]; }).sort();
+    assert.deepStrictEqual(strings, [0, 1], 'G and D strings');
+});
+
+test('an isolated high note prefers III over II', function () {
+    // F5 pinned to the A string is reachable as f4 in II or f3 in III;
+    // III is the working position a violinist writes. The old linear
+    // low-position preference made II strictly cheaper than III.
+    var res = core.solveChords([{pitches: [{pitch: 77, string: 2}]}], 0, 7);
+    assert.strictEqual(res[0].pos, 3, 'third position');
+    assert.strictEqual(res[0].combo[0][FING], 3, 'third finger');
+});
+
+test('spelling picks the displaced finger: sharp raised, flat lowered', function () {
+    // The same key on the fingerboard: F#5 on the A string in III is a
+    // raised 3rd finger, Gb5 a lowered 4th. MIDI alone cannot tell them
+    // apart; the spell hint (from tpc) must break the tie.
+    var sharp = core.solveChords([{pitches: [{pitch: 78, string: 2, spell: 1}]}], 0, 7);
+    assert.strictEqual(sharp[0].combo[0][OFF], 1, 'F# = raised finger');
+    var flat = core.solveChords([{pitches: [{pitch: 78, string: 2, spell: -1}]}], 0, 7);
+    assert.strictEqual(flat[0].combo[0][OFF], -1, 'Gb = lowered finger');
+});
+
 test('per-event key override: F#5 is in frame after a key change to D major', function () {
     // Piece-level key is C major, but the event carries key=2 (a mid-piece
     // signature change to D major): F#5 must be a plain in-frame finger,

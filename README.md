@@ -62,9 +62,15 @@ positions, string numbers).
   bow crossing (convex in string distance: adjacent cheap, skips expensive),
   same-finger string crossing (with a barre exception for perfect fifths on
   adjacent strings), same-finger semitone slides, finger stretches beyond
-  the hand frame, accidental displacement, with mild open-string and
-  low-position preferences for tie-breaking
-- Chord events solved as joint hand frames; open strings inherit position
+  the hand frame (within a position only), accidental displacement
+- Tie-breaking preferences: per-position costs (I and III are home, II and
+  IV cost more than their neighbors), per-string open-string penalties
+  (open E most, open G least), high positions slightly dearer on lower
+  strings, and enharmonic spelling steering displaced fingers (sharp =
+  raised lower finger, flat = lowered upper finger)
+- Chord events solved as joint hand frames on contiguous strings; double
+  stops may span two positions (fingered tenths); open strings inherit
+  position
 - Harmonics split the piece into independent segments
 
 ## Known limitations
@@ -72,6 +78,14 @@ positions, string numbers).
 - Harmonics (other than the 0+finger notation) are not specially detected
 - Pizzicato, col legno, and other special techniques are processed as
   ordinary notes
+- Note durations, rests, and slurs do not influence costs yet: a shift
+  before a whole note is priced like a shift mid-run
+- Notes held across other voices (and tied continuations) do not occupy
+  their string while later notes are solved
+- Unison double stops (two noteheads on the same pitch) are merged into a
+  single note
+- Grace notes and ornaments are not seen by the solver (a trilled note may
+  get finger 4)
 - The fingering optimizes for playability ("can be played"), not for
   expressive choices like timbre or string color, which experienced
   violinists would make manually

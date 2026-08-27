@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.4.0 (unreleased)
+
+Cost-model revision after a violinist's review of the algorithm:
+
+- Stretch and semitone-slide costs no longer fire across a position shift
+  (they used to tax every cross-finger shift landing, biasing the solver
+  toward same-finger shifts).
+- Simultaneous notes must sit on contiguous strings: no more double stops
+  with a silent string in the middle. Double stops may span two positions,
+  making fingered tenths playable (1 and 4, adjacent strings).
+- The low-position preference is now a per-position table: I and III are
+  home, V is common, II and IV cost more than their neighbors. An isolated
+  high note now lands in III with 3, not II with 4.
+- Open-string penalty is per string (E glares most, G least).
+- High positions cost slightly more on lower strings (the arm reaches
+  around the instrument's shoulder).
+- Enharmonic spelling (from tpc) breaks displacement ties: a sharp is a
+  raised lower finger, a flat a lowered upper finger.
+
 ## 1.3.0 (2026-08-26)
 
 - A manually noted finger now resets the Viterbi chain: each segment between

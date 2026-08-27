@@ -13,5 +13,6 @@ module.exports = new Function(src + `
 return {keyScale: keyScale, fingerPitch: fingerPitch,
         candidatesForPitch: candidatesForPitch,
         candidatesForEvent: candidatesForEvent, solveChords: solveChords,
+        chordTransCost: chordTransCost,
         ROMAN: ROMAN, STRING_NAMES: STRING_NAMES, TUNING: TUNING};
 `)();

@@ -17,7 +17,7 @@ import "violin_fingering_core.js" as Core
 
 MuseScore {
     id: plugin
-    version: "1.3.0"
+    version: "1.4.0"
     title: "ViolinFingering"
     description: "Violin fingering (string/finger/position) by dynamic programming. Reads key signature; writes finger numbers and Roman-numeral position marks."
     categoryCode: "composing-arranging-tools"
@@ -152,7 +152,8 @@ MuseScore {
                             if (ann.harmonic) byTick[t][p].harmonic = true;
                         } else {
                             byTick[t][p] = {midi: p, string: ann.string, finger: ann.finger,
-                                            harmonic: ann.harmonic, refs: [note]};
+                                            harmonic: ann.harmonic, refs: [note],
+                                            spell: spellOf(note)};
                         }
                     }
                 }
@@ -169,6 +170,18 @@ MuseScore {
                          key: keyByTick[ticks[ti]]});
         }
         return events;
+    }
+
+    // Spelling from MuseScore's tonal pitch class: tpc 13-19 are naturals,
+    // 20 and up the sharp side, 12 and down the flat side. Tells the solver
+    // which finger a displaced note is written for (sharp = raised lower
+    // finger, flat = lowered upper finger).
+    function spellOf(note) {
+        try {
+            if (note.tpc >= 20) return 1;
+            if (note.tpc <= 12) return -1;
+        } catch (e) {}
+        return 0;
     }
 
     function readAnnotations(note, tick) {
@@ -372,7 +385,7 @@ MuseScore {
             return {
                 pitches: e.pitches.map(function (p) {
                     return {pitch: p.midi, string: p.string, finger: p.finger,
-                            harmonic: p.harmonic || false};
+                            spell: p.spell || 0, harmonic: p.harmonic || false};
                 }),
                 key: e.key,   // key signature in effect at this tick
                 isHarmonic: hasHarmonic
@@ -491,7 +504,7 @@ MuseScore {
             TextEdit {
                 id: statusText
                 width: parent.width
-                text: "v1.3.0 (selection staff + mid-piece key changes) - Run computes violin fingering and writes annotations; re-running replaces the plugin's own annotations while manual ones are honored as constraints. Clear removes the plugin's annotations. Issues: github.com/knoguchi/violin-fingering"
+                text: "v1.4.0 (cost model: positions, spelling, double stops) - Run computes violin fingering and writes annotations; re-running replaces the plugin's own annotations while manual ones are honored as constraints. Clear removes the plugin's annotations. Issues: github.com/knoguchi/violin-fingering"
                 wrapMode: TextEdit.Wrap
                 readOnly: true
                 selectByMouse: true
