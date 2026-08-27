@@ -7,7 +7,12 @@
 // position), the four fingers play four consecutive scale tones. An
 // accidental displaces the finger by +/-1 semitone from its key position.
 
-var TUNING = [55, 62, 69, 76];           // G3 D4 A4 E5 (low to high)
+// Default tuning is violin; solveChords and the candidate functions
+// accept an alternate 4-string fifths tuning (e.g. viola C3 G3 D4 A4).
+// The diatonic frame model carries over unchanged: viola is the same
+// hand a fifth lower.
+var TUNING = [55, 62, 69, 76];           // violin G3 D4 A4 E5 (low to high)
+var VIOLA_TUNING = [48, 55, 62, 69];     // viola C3 G3 D4 A4
 var STRING_NAMES = ["G", "D", "A", "E"];
 
 var SHARP_ORDER = [6, 1, 8, 3, 10, 5, 0];   // F# C# G# D# A# E# B# (mod 12)
@@ -33,8 +38,8 @@ function keyScale(key) {
     return out.sort(function (a, b) { return a - b; });
 }
 
-function fingerPitch(stringIdx, position, finger, key) {
-    var open = TUNING[stringIdx];
+function fingerPitch(stringIdx, position, finger, key, tuning) {
+    var open = (tuning || TUNING)[stringIdx];
     var scale = keyScale(key);
     var inScale = {};
     for (var i = 0; i < scale.length; i++) inScale[scale[i]] = 1;
@@ -46,15 +51,16 @@ function fingerPitch(stringIdx, position, finger, key) {
     return hits[(position - 1) + (finger - 1)];
 }
 
-function candidatesForPitch(pitch, key, maxPosition) {
+function candidatesForPitch(pitch, key, maxPosition, tuning) {
     if (maxPosition === undefined) maxPosition = 7;
+    var tun = tuning || TUNING;
     var out = [];
     for (var s = 0; s < 4; s++) {
-        if (pitch === TUNING[s]) { out.push([s, 0, 1, 0, pitch]); continue; }
-        if (pitch < TUNING[s]) continue;
+        if (pitch === tun[s]) { out.push([s, 0, 1, 0, pitch]); continue; }
+        if (pitch < tun[s]) continue;
         for (var p = 1; p <= maxPosition; p++) {
             for (var k = 1; k <= 4; k++) {
-                var nominal = fingerPitch(s, p, k, key);
+                var nominal = fingerPitch(s, p, k, key, tuning);
                 var off = pitch - nominal;
                 if (off === 0) out.push([s, k, p, 0, pitch]);
                 else if (off === 1 || off === -1) out.push([s, k, p, off, pitch]);
@@ -121,11 +127,11 @@ var OPEN_SHIFT_DISCOUNT = 0.5;
 var CHORD_POS_SPAN = 1;
 var CHORD_POS_SPAN_PAIR = 2;
 
-function candidatesForEvent(notes, key, maxPosition) {
+function candidatesForEvent(notes, key, maxPosition, tuning) {
     if (maxPosition === undefined) maxPosition = 7;
     var perNote = [];
     for (var i = 0; i < notes.length; i++) {
-        var cs = candidatesForPitch(notes[i].pitch, key, maxPosition);
+        var cs = candidatesForPitch(notes[i].pitch, key, maxPosition, tuning);
         if (notes[i].string != null) {
             var ms = 4 - notes[i].string;
             cs = cs.filter(function (c) { return c[0] === ms; });
@@ -226,7 +232,8 @@ function chordLocalCost(entry) {
     return c;
 }
 
-function chordTransCost(prev, cur) {
+function chordTransCost(prev, cur, tuning) {
+    var tun = tuning || TUNING;
     var c = 0.0;
     if (prev.pos !== cur.pos) {
         var shift = W_POS_FIXED + W_POS_SHIFT * Math.abs(prev.pos - cur.pos);
@@ -257,7 +264,7 @@ function chordTransCost(prev, cur) {
             // Barre = same physical spot on adjacent strings (perfect fifth),
             // regardless of how the key frame labels the two notes.
             var barre = Math.abs(a[0] - b[0]) === 1
-                && a[4] - TUNING[a[0]] === b[4] - TUNING[b[0]];
+                && a[4] - tun[a[0]] === b[4] - tun[b[0]];
             c += barre ? W_BARRE : W_SAME_FINGER_CROSS;
         } else if (a[0] === b[0] && a[1] > 0 && b[1] > 0 && a[1] !== b[1]) {
             // Dropping/lifting to another finger in frame is free;
@@ -280,13 +287,13 @@ function chordTransCost(prev, cur) {
 // hand is, so the chain restarts there. Each segment [pin, next pin) is
 // solved independently - downstream context cannot drag notes before a
 // pin away from the pinned position, and vice versa.
-function solveChords(events, key, maxPosition) {
+function solveChords(events, key, maxPosition, tuning) {
     if (!events.length) return [];
     var out = [];
     var start = 0;
     for (var i = 1; i <= events.length; i++) {
         if (i < events.length && !eventHasPin(events[i])) continue;
-        var seg = solveChordSeg(events.slice(start, i), key, maxPosition);
+        var seg = solveChordSeg(events.slice(start, i), key, maxPosition, tuning);
         if (!seg) return null;
         out = out.concat(seg);
         start = i;
@@ -300,12 +307,12 @@ function eventHasPin(e) {
     return false;
 }
 
-function solveChordSeg(events, key, maxPosition) {
+function solveChordSeg(events, key, maxPosition, tuning) {
     if (!events.length) return [];
     var layers = [];
     for (var i = 0; i < events.length; i++) {
         var evKey = events[i].key != null ? events[i].key : key;
-        var combos = candidatesForEvent(events[i].pitches, evKey, maxPosition);
+        var combos = candidatesForEvent(events[i].pitches, evKey, maxPosition, tuning);
         if (!combos.length) return null;
         layers.push(combos);
     }
@@ -319,7 +326,7 @@ function solveChordSeg(events, key, maxPosition) {
             var best = Infinity, bestK = -1;
             for (var k2 = 0; k2 < layers[t - 1].length; k2++) {
                 var cand = cost[t - 1][k2]
-                    + chordTransCost(layers[t - 1][k2], layers[t][j])
+                    + chordTransCost(layers[t - 1][k2], layers[t][j], tuning)
                     + lc;
                 if (cand < best) { best = cand; bestK = k2; }
             }

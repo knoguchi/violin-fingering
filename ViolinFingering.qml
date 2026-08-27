@@ -3,11 +3,12 @@
 // License: GPL-3.0 (see LICENSE)
 // https://github.com/knoguchi/violin-fingering
 //
-// Computes (string, finger, position) for every note of a violin score using
-// position-aware Viterbi dynamic programming, and writes finger numbers and
-// position marks as annotations on the staff. Tuning is fixed to G3 D4 A4 E5;
-// the key signature is read from the score and determines the finger layout
-// at each (string, position).
+// Computes (string, finger, position) for every note of a violin or viola
+// staff using position-aware Viterbi dynamic programming, and writes finger
+// numbers and position marks as annotations. The staff is chosen in the
+// dialog; its instrument (violin G3 D4 A4 E5 / viola C3 G3 D4 A4) is
+// detected from the part. The key signature is read from the score and
+// determines the finger layout at each (string, position).
 
 import QtQuick
 import QtQuick.Controls
@@ -17,7 +18,7 @@ import "violin_fingering_core.js" as Core
 
 MuseScore {
     id: plugin
-    version: "1.4.0"
+    version: "1.5.0"
     title: "ViolinFingering"
     description: "Violin fingering (string/finger/position) by dynamic programming. Reads key signature; writes finger numbers and Roman-numeral position marks."
     categoryCode: "composing-arranging-tools"
@@ -43,6 +44,27 @@ MuseScore {
     // One staff at a time; a selection only narrows the tick range.
     property int targetStaff: 0
     property var staffModel: []
+
+    // Instrument of the chosen staff: violin (default) or viola. Detected
+    // from the part's instrument id, with a pitch-range fallback (notes
+    // below the violin's open G but within viola range). Same hand model,
+    // one fifth lower.
+    property var tuningViolin: [55, 62, 69, 76]
+    property var tuningViola: [48, 55, 62, 69]
+    property var activeTuning: [55, 62, 69, 76]
+    property string activeInstrument: "violin"
+
+    function detectInstrument(partIndex) {
+        try {
+            var part = curScore.parts[partIndex];
+            var id = "";
+            try { if (part.instrumentId) id += part.instrumentId; } catch (e1) {}
+            try { if (part.musicXmlId) id += "|" + part.musicXmlId; } catch (e2) {}
+            if (/viola/i.test(id)) return "viola";
+            if (id) return "violin";
+        } catch (e) {}
+        return "";   // unknown: caller may fall back on pitch range
+    }
 
     // One dropdown entry per staff, labeled with its part name.
     function buildStaffModel() {
@@ -270,8 +292,7 @@ MuseScore {
         // removal instead and never become constraints.
         var out = {string: null, finger: null, harmonic: false};
         if (!note.elements) return out;
-        var isOpenStringPitch = (note.pitch === 55 || note.pitch === 62
-                              || note.pitch === 69 || note.pitch === 76);
+        var isOpenStringPitch = activeTuning.indexOf(note.pitch) >= 0;
         var plainDigits = [], humanEls = [];
         for (var i = 0; i < note.elements.length; i++) {
             var el = note.elements[i];
@@ -450,8 +471,27 @@ MuseScore {
     }
 
     function apply() {
+        // Instrument first (readAnnotations checks open-string pitches),
+        // then a pitch-range fallback once the notes are known.
+        var entry = staffModel.length
+            ? staffModel[Math.max(0, staffSelect.currentIndex)] : null;
+        var inst = entry ? detectInstrument(entry.partIndex) : "";
+        activeInstrument = inst === "viola" ? "viola" : "violin";
+        activeTuning = activeInstrument === "viola" ? tuningViola : tuningViolin;
         var events = collectEvents();
         if (events.length === 0) { statusText.text = "No notes found"; return; }
+        if (!inst) {
+            // Unknown instrument id: notes below the violin's open G but
+            // within viola range can only mean a viola part.
+            for (var ri = 0; ri < events.length; ri++) {
+                var low = events[ri].pitches[events[ri].pitches.length - 1].midi;
+                if (low < 55 && low >= 48) {
+                    activeInstrument = "viola";
+                    activeTuning = tuningViola;
+                    break;
+                }
+            }
+        }
         var key = readKeySignature();
         // Build chord events. Events with any harmonic note become segment
         // boundaries: solved independently from neighboring segments because
@@ -480,7 +520,7 @@ MuseScore {
                         return !e.isHarmonic;
                     });
                     if (seg.length > 0) {
-                        var segResult = Core.solveChords(seg, key, 7);
+                        var segResult = Core.solveChords(seg, key, 7, activeTuning);
                         if (segResult) {
                             var ri = 0;
                             for (var k = segStart; k < ei; k++) {
@@ -510,9 +550,10 @@ MuseScore {
             var bad = [];
             for (var bi = 0; bi < events.length && bad.length < 10; bi++)
                 for (var bj = 0; bj < events[bi].pitches.length && bad.length < 10; bj++)
-                    if (Core.candidatesForPitch(events[bi].pitches[bj].midi, key, 7).length === 0)
+                    if (Core.candidatesForPitch(events[bi].pitches[bj].midi, key, 7, activeTuning).length === 0)
                         bad.push(noteName(events[bi].pitches[bj].midi) + " at tick " + events[bi].tick);
-            statusText.text = "ViolinFingering could not solve this score (some notes outside violin range).\n"
+            statusText.text = "ViolinFingering could not solve this staff (some notes outside "
+                + activeInstrument + " range).\n"
                 + (bad.length ? "Unplayable: " + bad.join(", ") + "\n" : "")
                 + "Report issues at https://github.com/knoguchi/violin-fingering/issues";
             return;
@@ -529,7 +570,7 @@ MuseScore {
         var posStr = Object.keys(posDist).sort().map(function (k) {
             return "pos" + k + ":" + posDist[k];
         }).join(" ");
-        statusText.text = "Key: " + key + " (" + (key > 0 ? key + " sharps" : key < 0 ? (-key) + " flats" : "C major / A minor") + ")\n"
+        statusText.text = "Instrument: " + activeInstrument + " / Key: " + key + " (" + (key > 0 ? key + " sharps" : key < 0 ? (-key) + " flats" : "C major / A minor") + ")\n"
             + "Done: " + events.length + " events processed\n"
             + "Fingers written: " + stats.fing
             + (writeStrings.checked ? " / strings: " + stats.str : "")
@@ -596,7 +637,7 @@ MuseScore {
             TextEdit {
                 id: statusText
                 width: parent.width
-                text: "v1.4.0 (cost model: positions, spelling, double stops) - Run computes violin fingering and writes annotations; re-running replaces the plugin's own annotations while manual ones are honored as constraints. Clear removes the plugin's annotations. Issues: github.com/knoguchi/violin-fingering"
+                text: "v1.5.0 (staff selector, viola support) - Run computes fingering for the chosen staff and writes annotations; re-running replaces the plugin's own annotations while manual ones are honored as constraints. Clear removes the plugin's annotations. Issues: github.com/knoguchi/violin-fingering"
                 wrapMode: TextEdit.Wrap
                 readOnly: true
                 selectByMouse: true

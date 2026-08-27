@@ -14,5 +14,6 @@ return {keyScale: keyScale, fingerPitch: fingerPitch,
         candidatesForPitch: candidatesForPitch,
         candidatesForEvent: candidatesForEvent, solveChords: solveChords,
         chordTransCost: chordTransCost,
-        ROMAN: ROMAN, STRING_NAMES: STRING_NAMES, TUNING: TUNING};
+        ROMAN: ROMAN, STRING_NAMES: STRING_NAMES,
+        TUNING: TUNING, VIOLA_TUNING: VIOLA_TUNING};
 `)();

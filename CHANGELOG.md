@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.5.0 (unreleased)
+
+- Staff selector: the dialog lists every staff by part name; Run and
+  Clear process exactly the chosen staff (defaulting to the selection's
+  staff). A range selection only narrows the tick window. Previously a
+  whole-score run silently processed the top staff only.
+- Viola support: the chosen staff's instrument is detected from the part
+  (with a pitch-range fallback) and the solver uses viola tuning
+  (C3 G3 D4 A4) - same hand model, one fifth lower.
+- Registry v2 keys annotations by staff, so two staves sharing tick and
+  pitch (quartet unisons) cannot consume each other's entries; v1 tags
+  are still recognized and migrate as they are rewritten.
+
 ## 1.4.0 (2026-08-26)
 
 Cost-model revision after a violinist's review of the algorithm:

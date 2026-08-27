@@ -188,6 +188,33 @@ test('spelling picks the displaced finger: sharp raised, flat lowered', function
     assert.strictEqual(flat[0].combo[0][OFF], -1, 'Gb = lowered finger');
 });
 
+test('viola tuning: the C string exists, violin range check unchanged', function () {
+    // C3 is the viola's open C - unplayable on a violin.
+    assert.strictEqual(core.solveChords(melody([48]), 0, 7), null,
+        'C3 unplayable on violin');
+    var res = core.solveChords(melody([48]), 0, 7, core.VIOLA_TUNING);
+    assert.strictEqual(res[0].combo[0][STR], 0, 'lowest string');
+    assert.strictEqual(res[0].combo[0][FING], 0, 'open C');
+    // E3 = 2nd finger on the C string in first position (C major frame
+    // above C3: D E F G).
+    var e3 = core.solveChords(melody([52]), 0, 7, core.VIOLA_TUNING);
+    assert.strictEqual(e3[0].combo[0][STR], 0);
+    assert.strictEqual(e3[0].combo[0][FING], 2);
+    assert.strictEqual(e3[0].pos, 1);
+});
+
+test('viola tuning: barre fifths detected against viola strings', function () {
+    // D4+A4 on viola = same fret on the G and D strings (a fifth): the
+    // physical barre test must use the viola tuning, not the violin's.
+    var st = function (s, k, p, off, pitch) {
+        return {combo: [[s, k, p, off, pitch]], pos: p, openOnly: false};
+    };
+    // E3 (C string, fret 4) -> B3 (G string, fret 4): one-finger barre.
+    var c = core.chordTransCost(st(0, 2, 1, 0, 52), st(1, 2, 1, 0, 59),
+                                core.VIOLA_TUNING);
+    assert.ok(c < 1.0, 'barre discount applies (got ' + c + ')');
+});
+
 test('per-event key override: F#5 is in frame after a key change to D major', function () {
     // Piece-level key is C major, but the event carries key=2 (a mid-piece
     // signature change to D major): F#5 must be a plain in-frame finger,

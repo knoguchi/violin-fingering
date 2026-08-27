@@ -34,9 +34,12 @@ Annotated by the plugin:
 3. Open a violin score and run the plugin from the Plugins menu.
 
 ## Usage
-In a multi-part score, the selection picks the part: select a range on the
-staff you want fingered (e.g. Violin 2) and Run works on that staff only.
-With no selection, the top staff is processed. Repeat per part.
+The **Staff** dropdown picks the part to process (one staff at a time);
+it defaults to the staff of the current selection. A range selection
+narrows the tick window; with none, the whole score is processed. The
+staff's instrument is detected from the part: violin and viola are
+supported (viola uses C-G-D-A tuning, same hand model a fifth lower).
+Repeat per part in a multi-part score.
 
 - **Run**: computes fingering for the selection (or the whole score) and writes
   finger numbers and position marks as annotations on the staff.
@@ -74,7 +77,8 @@ positions, string numbers).
 - Harmonics split the piece into independent segments
 
 ## Known limitations
-- Tuning is fixed at standard violin (G3 D4 A4 E5)
+- Violin (G3 D4 A4 E5) and viola (C3 G3 D4 A4) only; cello's fingering
+  model (semitone frames, thumb position) is different and unsupported
 - Harmonics (other than the 0+finger notation) are not specially detected
 - Pizzicato, col legno, and other special techniques are processed as
   ordinary notes
