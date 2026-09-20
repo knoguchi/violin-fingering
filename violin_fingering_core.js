@@ -51,6 +51,41 @@ function fingerPitch(stringIdx, position, finger, key, tuning) {
     return hits[(position - 1) + (finger - 1)];
 }
 
+// --- L/H placement indicators (issue #4) -------------
+// Labels describe where a finger lands, not which note it plays: the
+// same finger number covers two spots a semitone apart, and beginner
+// method books mark the less usual one (2 vs 2L, 3 vs 3H, 1 vs 1L).
+// The unlabeled hand shape is 1-23-4 (first position on the A string:
+// B C# D E), i.e. semitone offsets 0, 2, 3, 5 from the first finger.
+// Pure post-processing of a solved (string, finger, position, pitch):
+// the solver never sees these labels.
+var HL_FRAME = [0, 2, 3, 5];
+
+// Where the first finger of the unlabeled shape sits. First position is
+// anchored to the nut (a whole tone above the open string) regardless
+// of key, which is what makes F natural on the E string "1L" even in C
+// major. Higher positions are named after where the hand is placed, so
+// they take the solver's key frame.
+function hlFrameBase(stringIdx, position, key, tuning) {
+    var open = (tuning || TUNING)[stringIdx];
+    if (position === 1) return open + 2;
+    return fingerPitch(stringIdx, position, 1, key, tuning);
+}
+
+// Finger label with placement suffix: "0" for an open string, otherwise
+// the finger digit followed by L (lower) or H (higher) per semitone of
+// deviation from the unlabeled spot. Deviations of two semitones are
+// rare (only reachable through unusual candidates) and are written
+// doubled ("2LL") rather than hidden.
+function hlLabel(stringIdx, finger, position, pitch, key, tuning) {
+    if (finger === 0) return "0";
+    var d = pitch - (hlFrameBase(stringIdx, position, key, tuning)
+                     + HL_FRAME[finger - 1]);
+    var suffix = "";
+    for (var i = 0; i < Math.abs(d); i++) suffix += d < 0 ? "L" : "H";
+    return "" + finger + suffix;
+}
+
 function candidatesForPitch(pitch, key, maxPosition, tuning) {
     if (maxPosition === undefined) maxPosition = 7;
     var tun = tuning || TUNING;

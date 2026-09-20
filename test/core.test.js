@@ -226,3 +226,70 @@ test('per-event key override: F#5 is in frame after a key change to D major', fu
     var res2 = core.solveChords(melody([78]), 0, 7);
     assert.notStrictEqual(res2[0].combo[0][OFF], 0, 'F#5 displaced under C major');
 });
+
+// --- L/H placement indicators (issue #4) ---
+// hlLabel(string, finger, position, pitch, key[, tuning])
+const G = 0, D = 1, A = 2, E = 3;
+
+function labels(stringIdx, position, key, pairs, tuning) {
+    return pairs.map(function (pf) {
+        return core.hlLabel(stringIdx, pf[1], position, pf[0], key, tuning);
+    });
+}
+
+test('hlLabel: first position follows the nut, not the key', function () {
+    // C major, A string: B C D E -> C is low 2
+    assert.deepStrictEqual(labels(A, 1, 0, [[71, 1], [72, 2], [74, 3], [76, 4]]),
+        ['1', '2L', '3', '4']);
+    // C major, E string: F G A B -> low 1, low 2 without any accidental
+    assert.deepStrictEqual(labels(E, 1, 0, [[77, 1], [79, 2], [81, 3], [83, 4]]),
+        ['1L', '2L', '3', '4']);
+    // D major, A string: B C# D E -> the unlabeled shape
+    assert.deepStrictEqual(labels(A, 1, 2, [[71, 1], [73, 2], [74, 3], [76, 4]]),
+        ['1', '2', '3', '4']);
+    // F major, A string: Bb is low 1 even though it is the key's own note
+    assert.deepStrictEqual(labels(A, 1, -1, [[70, 1], [72, 2], [74, 3], [76, 4]]),
+        ['1L', '2L', '3', '4']);
+});
+
+test('hlLabel: enharmonic pair splits into high 3 / low 4', function () {
+    // A string, first position: D#5 and Eb5 are the same pitch (75)
+    assert.strictEqual(core.hlLabel(A, 3, 1, 75, 3), '3H');
+    assert.strictEqual(core.hlLabel(A, 4, 1, 75, -3), '4L');
+});
+
+test('hlLabel: open strings are 0', function () {
+    assert.strictEqual(core.hlLabel(A, 0, 1, 69, 0), '0');
+});
+
+test('hlLabel: higher positions follow the hand frame', function () {
+    // D major, A string III: D E F# G -> 3 touches 4
+    assert.deepStrictEqual(labels(A, 3, 2, [[74, 1], [76, 2], [78, 3], [79, 4]]),
+        ['1', '2', '3H', '4']);
+    // F major, A string II: C D E F
+    assert.deepStrictEqual(labels(A, 2, -1, [[72, 1], [74, 2], [76, 3], [77, 4]]),
+        ['1', '2', '3H', '4']);
+});
+
+test('hlLabel: same pitch, different position, different label', function () {
+    // C5 on the A string in C major
+    assert.strictEqual(core.hlLabel(A, 2, 1, 72, 0), '2L');   // I
+    assert.strictEqual(core.hlLabel(A, 1, 2, 72, 0), '1');    // II (1 = C)
+});
+
+test('hlLabel: viola uses the same shapes a fifth lower', function () {
+    // C major, viola D string (index 2 = D4): E F G A -> F is low 2
+    assert.deepStrictEqual(
+        labels(2, 1, 0, [[64, 1], [65, 2], [67, 3], [69, 4]], core.VIOLA_TUNING),
+        ['1', '2L', '3', '4']);
+});
+
+test('hlLabel: every solved note gets a well-formed label', function () {
+    var res = core.solveChords(melody([67, 69, 71, 72, 74, 76, 78, 79, 81, 83]), 0, 7);
+    res.forEach(function (e) {
+        var c = e.combo[0];
+        var lab = core.hlLabel(c[STR], c[FING], c[POS], c[PITCH], 0);
+        assert.match(lab, /^[0-4]([LH]+)?$/);
+        assert.strictEqual(parseInt(lab), c[FING]);
+    });
+});

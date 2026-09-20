@@ -282,7 +282,9 @@ MuseScore {
 
     function readAnnotations(note, tick) {
         // Existing finger and string annotations are honored as constraints.
-        // - Plain digits 1-4 = finger number
+        // - Plain digits 1-4 = finger number; a placement suffix
+        //   ("2L", "3H", written by the L/H option or by hand) is accepted
+        //   and the digit is the constraint
         // - Plain "0" on an open-string pitch (G3/D4/A4/E5) = open-string finger
         // - "0" combined with a 1-4 digit = harmonic notation (lightly touch
         //   at the node with the given finger). Marked harmonic, excluded
@@ -305,7 +307,9 @@ MuseScore {
                     isString = true;
             } catch (e) {}
             var kind;
+            var hl = !isString && /^[0-4][LH]+$/.test(txt);
             if (/^[0-9]$/.test(txt)) kind = isString ? "s" : "f";
+            else if (hl) kind = "f";
             else if (/^[①-④]$/.test(txt)) kind = "s";  // circled string number
             else if (/^(I|II|III|IV)$/.test(txt)) kind = "s";    // legacy plugin string mark
             else continue;
@@ -318,7 +322,7 @@ MuseScore {
                 out.string = txt.charCodeAt(0) - 0x2460 + 1;
                 continue;
             }
-            if (!/^[0-9]$/.test(txt)) continue;   // human Roman text: no constraint
+            if (!/^[0-9]$/.test(txt) && !hl) continue;   // human Roman text: no constraint
             var v = parseInt(txt);
             if (kind === "s" && v >= 1 && v <= 4) out.string = v;
             else if (kind === "f") plainDigits.push(v);
@@ -389,7 +393,7 @@ MuseScore {
     }
 
     // -- write fingering annotations ---------------------
-    function writeAnnotations(events, result) {
+    function writeAnnotations(events, result, key) {
         curScore.startCmd();
         // annotations the user edited are theirs now: recolor to black
         for (var pr = 0; pr < promotedEls.length; pr++) {
@@ -417,12 +421,20 @@ MuseScore {
                 var hadFinger = pitchInfo.finger !== null;
                 var hadString = pitchInfo.string !== null;
                 if (writeFingers.checked && !hadFinger) {
-                    // open string finger = 0
+                    // open string finger = 0; with L/H on, "2L", "3H", ...
+                    // Each note of a chord labels against its own position
+                    // (a fingered tenth spans two).
+                    var ftxt = "" + k;
+                    if (writeHL.checked) {
+                        var evKey = events[i].key != null ? events[i].key : key;
+                        ftxt = Core.hlLabel(s, k, combo[j][2], combo[j][4],
+                                            evKey, activeTuning);
+                    }
                     var fing = newElement(Element.FINGERING);
-                    fing.text = "" + k;
+                    fing.text = ftxt;
                     fing.color = markerColor;
                     noteRefs[0].add(fing);
-                    newItems.push([events[i].tick, pitchInfo.midi, "f", "" + k, targetStaff]);
+                    newItems.push([events[i].tick, pitchInfo.midi, "f", ftxt, targetStaff]);
                     nFing++;
                 }
                 if (writeStrings.checked && !hadString) {
@@ -558,7 +570,7 @@ MuseScore {
                 + "Report issues at https://github.com/knoguchi/violin-fingering/issues";
             return;
         }
-        var stats = writeAnnotations(events, result);
+        var stats = writeAnnotations(events, result, key);
         // Position distribution
         var posDist = {};
         for (var i = 0; i < result.length; i++) {
@@ -605,6 +617,7 @@ MuseScore {
             }
         }
         CheckBox { id: writeFingers;   checked: true;  text: "Write left-hand finger numbers (1-4)" }
+        CheckBox { id: writeHL;        checked: false; text: "Mark finger placement (1L, 2L, 3H, 4L; unmarked = 1-23-4)" }
         CheckBox { id: writePositions; checked: true;  text: "Write positions (Roman numerals)" }
         CheckBox { id: writeStrings;   checked: false; text: "Write string numbers (①=E, ②=A, ③=D, ④=G)" }
         CheckBox { id: colorize;       checked: true;  text: "Color auto-written annotations blue" }

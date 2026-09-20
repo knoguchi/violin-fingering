@@ -58,6 +58,16 @@ Repeat per part in a multi-part score.
 Checkboxes control which kinds of annotation to write (finger numbers,
 positions, string numbers).
 
+**Mark finger placement** (off by default) adds beginner-style placement
+suffixes to the finger numbers: `1L`, `2L`, `3H`, `4L`. The unmarked
+hand shape is 1-23-4 (B C# D E on the A string in first position); a
+suffix says the finger sits a semitone lower or higher than that. First
+position is measured from the nut, so F natural on the E string is `1L`
+in any key; higher positions are measured from where the hand is
+placed. The labels are computed after the fingering is solved and do not
+change it. Hand-written `2L`/`3H` annotations are honored as finger
+constraints like plain digits.
+
 ## Algorithm overview
 - State: (string, finger, position) per note, with accidental offset
 - Candidates for each pitch: enumerated by the key-signature finger layout
