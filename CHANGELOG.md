@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Finger placement indicators (#4): optional `1L`/`2L`/`3H`/`4L` suffixes
+  on finger numbers, relative to the 1-23-4 hand shape. First position is
+  anchored to the nut (key-independent); higher positions to the hand
+  frame. Computed as post-processing (`hlLabel` in the core); the solver
+  is unchanged. Suffixed annotations are recognized on re-run and Clear,
+  and hand-written ones are honored as finger constraints.
+
 ## 1.5.0 (2026-08-26)
 
 - Staff selector: the dialog lists every staff by part name; Run and
