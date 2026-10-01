@@ -1,6 +1,36 @@
 # Changelog
 
-## Unreleased
+## 1.6.0-rc1 (2026-10-01)
+
+- The plugin sits at the top level of the Plugins menu (no category), so it
+  is one click away instead of under Composing/arranging tools.
+- Selection wins: a range selection decides the staff (its first) and the
+  tick range; the Staff dropdown shows only with no selection. A summary
+  line names the target.
+- Per-instrument config: all tuning, hand-frame geometry and cost weights
+  moved into `INSTRUMENTS` (violin, viola, cello) in the core; functions
+  take an instrument name/config instead of a bare tuning. Violin and
+  viola output is unchanged (golden snapshot test).
+- Cello (first cut): chromatic hand frame incl. half position, cello
+  weights favoring fingers 1-2 high up the neck. Open strings cost little (they
+  are idiomatic on the cello): Bach's G major prelude now starts G D open,
+  B 1, A open in position I instead of a fingered shape in V.
+- Cello thumb position: the thumb is finger 5. MuseScore stores the
+  thumb-position sign as an articulation on the chord, so the plugin writes
+  and reads that (one per chord; a hand-placed sign pins the chord's lowest
+  note to the thumb; Clear removes the plugin's own). The solver fingers without the
+  thumb first and lets it compete only where the local cost (averaged over +/- 6 events) exceeds a
+  threshold; a hand-placed sign always counts. Offset, entry position,
+  threshold and cost are placeholders to tune against real cello fingerings.
+- Annotation recognition (Clear, re-run, manual constraints) is now built
+  from the config: position marks up to XX and the half mark, string
+  marks up to the largest string count (fixes cello positions above VIII
+  and the 5-string violin's fifth string being left behind).
+- Instrument radio buttons, pre-selected from the part and remembered
+  between runs. String-number key follows the instrument.
+- Cello and a 5-string violin (C-G-D-A-E) are offered next to Violin and
+  Viola; the dialog shows "<instrument> is experimental" in red while one
+  is selected.
 
 - Finger placement indicators (#4): optional `1L`/`2L`/`3H`/`4L` suffixes
   on finger numbers, relative to the 1-23-4 hand shape. First position is

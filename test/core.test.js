@@ -192,12 +192,12 @@ test('viola tuning: the C string exists, violin range check unchanged', function
     // C3 is the viola's open C - unplayable on a violin.
     assert.strictEqual(core.solveChords(melody([48]), 0, 7), null,
         'C3 unplayable on violin');
-    var res = core.solveChords(melody([48]), 0, 7, core.VIOLA_TUNING);
+    var res = core.solveChords(melody([48]), 0, 7, "viola");
     assert.strictEqual(res[0].combo[0][STR], 0, 'lowest string');
     assert.strictEqual(res[0].combo[0][FING], 0, 'open C');
     // E3 = 2nd finger on the C string in first position (C major frame
     // above C3: D E F G).
-    var e3 = core.solveChords(melody([52]), 0, 7, core.VIOLA_TUNING);
+    var e3 = core.solveChords(melody([52]), 0, 7, "viola");
     assert.strictEqual(e3[0].combo[0][STR], 0);
     assert.strictEqual(e3[0].combo[0][FING], 2);
     assert.strictEqual(e3[0].pos, 1);
@@ -211,7 +211,7 @@ test('viola tuning: barre fifths detected against viola strings', function () {
     };
     // E3 (C string, fret 4) -> B3 (G string, fret 4): one-finger barre.
     var c = core.chordTransCost(st(0, 2, 1, 0, 52), st(1, 2, 1, 0, 59),
-                                core.VIOLA_TUNING);
+                                "viola");
     assert.ok(c < 1.0, 'barre discount applies (got ' + c + ')');
 });
 
@@ -280,7 +280,7 @@ test('hlLabel: same pitch, different position, different label', function () {
 test('hlLabel: viola uses the same shapes a fifth lower', function () {
     // C major, viola D string (index 2 = D4): E F G A -> F is low 2
     assert.deepStrictEqual(
-        labels(2, 1, 0, [[64, 1], [65, 2], [67, 3], [69, 4]], core.VIOLA_TUNING),
+        labels(2, 1, 0, [[64, 1], [65, 2], [67, 3], [69, 4]], "viola"),
         ['1', '2L', '3', '4']);
 });
 
@@ -292,4 +292,213 @@ test('hlLabel: every solved note gets a well-formed label', function () {
         assert.match(lab, /^[0-4]([LH]+)?$/);
         assert.strictEqual(parseInt(lab), c[FING]);
     });
+});
+
+// --- cello ---
+
+test('cello: tuning, detection', function () {
+    assert.deepStrictEqual(core.INSTRUMENTS.cello.strings.tuning, [36, 43, 50, 57]);
+    assert.strictEqual(core.detectInstrument('strings.cello'), 'cello');
+    assert.strictEqual(core.detectInstrument('strings.viola'), 'viola');
+    assert.strictEqual(core.detectInstrument('strings.violin'), 'violin');
+    assert.strictEqual(core.detectInstrument('wind.flute'), '');
+});
+
+test('cello: chromatic frame ignores the key signature', function () {
+    for (const key of [0, 3, -4]) {
+        assert.strictEqual(core.fingerPitch(3, 1, 1, key, 'cello'), 59);  // A string, f1 = B3
+        assert.strictEqual(core.fingerPitch(3, 1, 4, key, 'cello'), 62);  // f4 = D4
+    }
+});
+
+test('cello: open strings, half position, range floor', function () {
+    const c = core.candidatesForPitch(36, 0, undefined, 'cello');
+    assert.ok(c.some(function (x) { return x[STR] === 0 && x[FING] === 0; }));
+    // C#2 only exists as half position finger 1 on the C string
+    const cs = core.candidatesForPitch(37, 0, undefined, 'cello');
+    assert.ok(cs.length > 0 && cs.every(function (x) { return x[STR] === 0 && x[POS] === 0; }));
+    assert.strictEqual(core.candidatesForPitch(35, 0, undefined, 'cello').length, 0);
+});
+
+test('cello: no accidental displacement, every candidate is in frame', function () {
+    core.candidatesForPitch(62, 2, undefined, 'cello').forEach(function (c) {
+        assert.strictEqual(c[OFF], 0);
+    });
+});
+
+test('cello: first-position chromatic run stays in one position', function () {
+    // D3(open) E3 F3 F#3 G3 on the D string: open, then f1..f? within one frame
+    const r = core.solveChords(melody([52, 53, 54, 55]), 0, undefined, 'cello');
+    assert.ok(r);
+    const pos = r.map(function (e) { return e.pos; });
+    assert.ok(pos.every(function (p) { return p === pos[0]; }), 'one position: ' + pos);
+});
+
+test('cello: high melody prefers fingers 1-2 over 3-4 when it can shift', function () {
+    const r = core.solveChords(melody([69, 70, 69, 70, 69, 70, 69, 70]), 0, undefined, 'cello');
+    r.forEach(function (e) { assert.ok(e.combo[0][FING] <= 2, 'finger ' + e.combo[0][FING]); });
+});
+
+test('cello: double stops land on contiguous strings', function () {
+    // C2 + A3: the wide interval cannot sit on strings 0 and 3
+    const r = core.solveChords([{pitches: [{pitch: 36}, {pitch: 57}]}], 0, undefined, 'cello');
+    assert.ok(r);
+    const ss = r[0].combo.map(function (c) { return c[STR]; }).sort();
+    assert.strictEqual(ss[1] - ss[0], 1);
+});
+
+test('cello: L/H labels disabled by config', function () {
+    assert.strictEqual(core.INSTRUMENTS.cello.hand.hlEnabled, false);
+});
+
+// --- INSTRUMENTS consistency ---
+
+test('INSTRUMENTS: per-string and per-finger arrays match the config', function () {
+    Object.keys(core.INSTRUMENTS).forEach(function (name) {
+        const inst = core.INSTRUMENTS[name];
+        const n = inst.strings.tuning.length;
+        assert.strictEqual(inst.strings.names.length, n, name + ' strings.names');
+        assert.strictEqual(inst.strings.labels.length, n, name + ' strings.labels');
+        assert.strictEqual(inst.cost.open.length, n, name + ' cost.open');
+        const nFing = inst.hand.thumb ? 5 : 4;   // 4 fingers, plus the thumb
+        assert.strictEqual(inst.hand.frameOffsets.length, 4, name + ' hand.frameOffsets');
+        assert.strictEqual(inst.cost.fingerCost.length, nFing, name + ' cost.fingerCost');
+        assert.strictEqual(inst.cost.fingerHighPos.length, nFing, name + ' cost.fingerHighPos');
+        assert.ok(inst.hand.minPosition <= inst.hand.maxPosition, name + ' position range');
+    });
+});
+
+test('INSTRUMENTS: only cello and 5-string violin are experimental', function () {
+    const exp = Object.keys(core.INSTRUMENTS).filter(function (n) {
+        return core.INSTRUMENTS[n].experimental;
+    });
+    assert.deepStrictEqual(exp, ['cello', 'violin5']);
+});
+
+// --- 5-string violin ---
+
+test('violin5: never auto-detected; violin and viola ids unchanged', function () {
+    assert.strictEqual(core.detectInstrument('strings.violin'), 'violin');
+    assert.strictEqual(core.detectInstrument('strings.viola'), 'viola');
+});
+
+test('violin5: open E is a candidate and costs are finite', function () {
+    const open = core.candidatesForPitch(76, 0, 7, 'violin5')
+        .filter(function (c) { return c[0] === 4 && c[1] === 0; });
+    assert.strictEqual(open.length, 1);
+    // string 1 = highest: pins the open E (index 4), which needs a finite open cost
+    const res = core.solveChords(melody([{pitch: 76, string: 1}]), 0, 7, 'violin5');
+    assert.ok(res);
+    assert.strictEqual(res[0].combo[0][STR], 4);
+    assert.strictEqual(res[0].combo[0][FING], 0);
+});
+
+// --- thumb (cello) and annotation vocabulary ---
+
+test('thumb: only the cello has one; finger 5 is the thumb', function () {
+    assert.ok(core.INSTRUMENTS.cello.hand.thumb);
+    assert.ok(!core.INSTRUMENTS.violin.hand.thumb);
+    assert.ok(!core.INSTRUMENTS.viola.hand.thumb);
+    assert.strictEqual(core.fingerFromText('T'), -1);                 // a letter is not a thumb
+    assert.strictEqual(core.fingerFromText('3'), 3);
+    assert.strictEqual(core.fingerFromText('<b>3</b>'), 3);
+    assert.strictEqual(core.fingerFromText('II'), -1);
+});
+
+test('thumb: pitch sits thumb.offset below finger 1 of the same position', function () {
+    const th = core.INSTRUMENTS.cello.hand.thumb;
+    for (const pos of [th.minPosition, th.minPosition + 3])
+        assert.strictEqual(core.fingerPitch(3, pos, core.THUMB, 0, 'cello'),
+                           core.fingerPitch(3, pos, 1, 0, 'cello') + th.offset);
+});
+
+test('thumb: candidates only from minPosition, never on violin/viola', function () {
+    const th = core.INSTRUMENTS.cello.hand.thumb;
+    const cands = core.candidatesForPitch(70, 0, 20, 'cello')
+        .filter(function (c) { return c[1] === core.THUMB; });
+    assert.ok(cands.length > 0);
+    cands.forEach(function (c) { assert.ok(c[2] >= th.minPosition); });
+    ['violin', 'viola'].forEach(function (n) {
+        core.candidatesForPitch(79, 0, 7, n).forEach(function (c) {
+            assert.ok(c[1] <= 4, n);
+        });
+    });
+});
+
+test('thumb: a pinned thumb is honored', function () {
+    const th = core.INSTRUMENTS.cello.hand.thumb;
+    const res = core.solveChords(melody([{pitch: 70, finger: core.THUMB}]), 0, 20, 'cello');
+    assert.ok(res);
+    assert.strictEqual(res[0].combo[0][FING], core.THUMB);
+    assert.ok(res[0].combo[0][POS] >= th.minPosition);
+    const c = res[0].combo[0];
+    assert.strictEqual(core.hlLabel(c[STR], c[FING], c[POS], c[4], 0, 'cello'),
+                       core.THUMB_KEY);
+});
+
+test('thumb: same-pitch thumb on adjacent strings is a barre (cheap), not a crossing', function () {
+    // thumb at one spot across A and D (a perfect fifth): pitches 70 (A) and 63 (D)
+    const t = core.THUMB;
+    const posA = 14, posD = 14;
+    const a = {combo: [[3, t, posA, 0, core.fingerPitch(3, posA, t, 0, 'cello')]], pos: posA, openOnly: false};
+    const b = {combo: [[2, t, posD, 0, core.fingerPitch(2, posD, t, 0, 'cello')]], pos: posD, openOnly: false};
+    const cost = core.chordTransCost(a, b, 'cello');
+    const inst = core.INSTRUMENTS.cello.cost;
+    assert.ok(cost < inst.sameFingerCross, 'barre cost ' + cost);
+});
+
+test('annotation vocabulary: string labels, position marks, string counts', function () {
+    assert.strictEqual(core.stringFromLabel('③'), 3);
+    assert.strictEqual(core.stringFromLabel('⑤'), 5);   // 5-string violin
+    assert.strictEqual(core.stringFromLabel('A'), 0);
+    assert.strictEqual(core.maxStrings(), 5);
+    ['\u00bd', 'I', 'VIII', 'IX', 'XX'].forEach(function (m) {
+        assert.ok(core.isPositionMark(m), m);
+    });
+    assert.ok(!core.isPositionMark('XXI'));
+    assert.ok(!core.isPositionMark('T'));
+});
+
+test('thumb: articulation recognised by symbol id or subtype name', function () {
+    assert.ok(core.isThumbArticulation(core.THUMB_SYMID, undefined));
+    assert.ok(core.isThumbArticulation(-1, 'Thumb position'));
+    assert.ok(!core.isThumbArticulation(1234, 'Staccato'));
+});
+
+test('thumb: competes only where the four-finger cost exceeds the threshold', function () {
+    const th = core.INSTRUMENTS.cello.hand.thumb;
+    const saved = th.threshold;
+    const passage = melody([69, 72, 70, 74, 76, 72, 69, 65, 62, 64, 65, 70, 76, 71, 73, 79, 76, 74, 72, 70]);
+    const thumbs = function () {
+        return core.solveChords(passage, 0, 20, 'cello')
+            .filter(function (r) { return r.combo[0][FING] === core.THUMB; }).length;
+    };
+    try {
+        th.threshold = 1e9;
+        assert.strictEqual(thumbs(), 0, 'never flagged: no thumb');
+        th.threshold = -1;
+        assert.ok(thumbs() > 0, 'always flagged: the thumb competes and wins somewhere');
+    } finally { th.threshold = saved; }
+});
+
+test('thumb: an easy low passage never uses it with the default threshold', function () {
+    const res = core.solveChords(melody([36, 38, 40, 41, 43, 45, 47, 48]), 0, 20, 'cello');
+    res.forEach(function (r) { assert.notStrictEqual(r.combo[0][FING], core.THUMB); });
+});
+
+test('cello: Bach G major prelude bar 1 uses the open strings in first position', function () {
+    // The first two bars (G2 D3 B3 A3 B3 D3 B3 D3 ... then the second bar
+    // over a C-E-C-B-C-E-C-E): G open, D open, B finger 1 on the A string,
+    // A open in I, not a fingered shape up in V. Needs the following bar as
+    // context; alone, a single bar has nothing pulling the hand home.
+    const ps = [43, 50, 59, 57, 59, 50, 59, 50, 43, 50, 59, 57, 59, 50, 59, 50,
+                43, 52, 60, 59, 60, 52, 60, 52, 43, 52, 60, 59, 60, 52, 60, 52];
+    const res = core.solveChords(melody(ps), 1, 20, 'cello');
+    assert.ok(res);
+    const want = {43: [1, 0], 50: [2, 0], 57: [3, 0], 59: [3, 1]};   // pitch -> [string idx, finger]
+    for (let i = 0; i < 16; i++) {
+        const c = res[i].combo[0];
+        assert.deepStrictEqual([c[STR], c[FING]], want[ps[i]], 'note ' + i + ' (' + ps[i] + ')');
+        assert.strictEqual(res[i].pos, 1, 'note ' + i + ' position');
+    }
 });

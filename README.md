@@ -34,14 +34,21 @@ Annotated by the plugin:
 3. Open a violin score and run the plugin from the Plugins menu.
 
 ## Usage
-The **Staff** dropdown picks the part to process (one staff at a time);
-it defaults to the staff of the current selection. A range selection
-narrows the tick window; with none, the whole score is processed. The
-staff's instrument is detected from the part: violin and viola are
-supported (viola uses C-G-D-A tuning, same hand model a fifth lower).
-Repeat per part in a multi-part score.
+Select the measures you want fingered (a range on one staff) and run the
+plugin: the selection decides the staff and the range. With no selection,
+the **Staff** dropdown picks the staff and the whole staff is processed.
+One staff at a time: if the selection spans several staves, the first is
+used (the dialog says so); repeat per part in a multi-part score.
 
-- **Run**: computes fingering for the selection (or the whole score) and writes
+The staff's instrument is pre-selected from the part. Use the **Instrument**
+radio buttons in the dialog to override it (the last choice is
+remembered). Viola uses C-G-D-A tuning with the same hand model a fifth
+lower. Cello (a chromatic, semitone-per-finger hand frame) and a
+5-string violin (C-G-D-A-E) are also offered; the dialog marks them
+"experimental" in red.
+
+
+- **Run**: computes fingering for the selected measures (or the whole staff) and writes
   finger numbers and position marks as annotations on the staff.
   Re-running (e.g. after a plugin update) replaces the plugin's own previous
   annotations: everything the plugin writes is tracked in a score meta tag
@@ -87,8 +94,10 @@ constraints like plain digits.
 - Harmonics split the piece into independent segments
 
 ## Known limitations
-- Violin (G3 D4 A4 E5) and viola (C3 G3 D4 A4) only; cello's fingering
-  model (semitone frames, thumb position) is different and unsupported
+- Cello support is a first cut: chromatic frame with half position and a
+  thumb (written as the thumb-position sign); no extensions, and thumb and other weights are
+  untuned placeholders (all per-instrument
+  values live in `INSTRUMENTS` in `violin_fingering_core.js`)
 - Harmonics (other than the 0+finger notation) are not specially detected
 - Pizzicato, col legno, and other special techniques are processed as
   ordinary notes

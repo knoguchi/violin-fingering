@@ -3,11 +3,11 @@
 // License: GPL-3.0 (see LICENSE)
 // https://github.com/knoguchi/violin-fingering
 //
-// Computes (string, finger, position) for every note of a violin or viola
+// Computes (string, finger, position) for every note of a violin, viola or cello
 // staff using position-aware Viterbi dynamic programming, and writes finger
 // numbers and position marks as annotations. The staff is chosen in the
-// dialog; its instrument (violin G3 D4 A4 E5 / viola C3 G3 D4 A4) is
-// detected from the part. The key signature is read from the score and
+// dialog; its instrument (per the radio buttons) is
+// pre-selected from the part. The key signature is read from the score and
 // determines the finger layout at each (string, position).
 
 import QtQuick
@@ -18,52 +18,134 @@ import "violin_fingering_core.js" as Core
 
 MuseScore {
     id: plugin
-    version: "1.5.0"
+    version: "1.6.0-rc1"
     title: "ViolinFingering"
     description: "Violin fingering (string/finger/position) by dynamic programming. Reads key signature; writes finger numbers and Roman-numeral position marks."
-    categoryCode: "composing-arranging-tools"
     pluginType: "dialog"
     width: 420
-    height: 500
+    height: 530
 
     onRun: {
         if (!curScore) {
-            statusText.text = "No score is open";
+            statusBody = "No score is open";
             return;
         }
         staffModel = buildStaffModel();
-        // default the dropdown to the selection's staff, if there is one
-        var c = curScore.newCursor();
-        c.rewind(Cursor.SELECTION_START);
-        var defStaff = c.segment ? c.staffIdx : 0;
-        for (var i = 0; i < staffModel.length; i++)
-            if (staffModel[i].staff === defStaff) { staffSelect.currentIndex = i; break; }
+        lastStaff = -1;
+        refreshTarget();
     }
 
-    // The staff being processed: chosen in the dialog's staff dropdown.
-    // One staff at a time; a selection only narrows the tick range.
+    // The staff being processed. A range selection wins: its first staff and
+    // its tick range. With no selection the staff dropdown picks the staff
+    // and the whole staff is processed. One staff at a time.
     property int targetStaff: 0
     property var staffModel: []
+    // {has, staff, nStaves} describing the current range selection.
+    property var sel: ({has: false, staff: 0, nStaves: 0})
+    property int lastStaff: -1
 
-    // Instrument of the chosen staff: violin (default) or viola. Detected
-    // from the part's instrument id, with a pitch-range fallback (notes
-    // below the violin's open G but within viola range). Same hand model,
-    // one fifth lower.
-    property var tuningViolin: [55, 62, 69, 76]
-    property var tuningViola: [48, 55, 62, 69]
-    property var activeTuning: [55, 62, 69, 76]
+    function readSelection() {
+        var out = {has: false, staff: 0, nStaves: 0};
+        var c = curScore.newCursor();
+        c.rewind(Cursor.SELECTION_START);
+        if (!c.segment) return out;
+        out.has = true;
+        out.staff = c.staffIdx;
+        out.nStaves = 1;
+        try {
+            var n = curScore.selection.endStaff - curScore.selection.startStaff;
+            if (n > 1) out.nStaves = n;
+        } catch (e) {}
+        return out;
+    }
+
+    function staffEntry(staffIdx) {
+        for (var i = 0; i < staffModel.length; i++)
+            if (staffModel[i].staff === staffIdx) return staffModel[i];
+        return null;
+    }
+
+    function effectiveStaff() {
+        if (sel.has) return sel.staff;
+        return staffModel.length
+            ? staffModel[Math.max(0, staffSelect.currentIndex)].staff : 0;
+    }
+
+    // Re-read the selection (it may have changed while the dialog is open)
+    // and pre-select the instrument when the staff under work changed.
+    function refreshTarget() {
+        sel = readSelection();
+        var st = effectiveStaff();
+        if (st !== lastStaff) { lastStaff = st; instrumentForStaff(); }
+    }
+
+    // "Selection: 2: Violin II - 5-string violin", for the line above the options.
+    function targetSummary() {
+        var e = staffEntry(effectiveStaff());
+        var txt = (sel.has ? "Selection: " : "Whole staff: ") + (e ? e.text : "?");
+        if (sel.nStaves > 1)
+            txt += " (first of " + sel.nStaves + " selected staves; one at a time)";
+        return txt + " - " + (activeInst ? activeInst.label : "");
+    }
+
+    // Instrument being fingered: the instrument radio buttons. The
+    // staff dropdown pre-selects it from the part's instrument id; the
+    // last choice is remembered (see prefs) for parts with unknown ids.
+    // All geometry and cost weights come from Core.INSTRUMENTS.
     property string activeInstrument: "violin"
+    readonly property var activeInst: Core.INSTRUMENTS[activeInstrument]
+    property var prefs: null
+    // Result or error shown under the version line in the status area, so a
+    // copied status always carries the version (for issue reports).
+    property string statusBody: ""
 
-    function detectInstrument(partIndex) {
+    // Every instrument in Core.INSTRUMENTS gets a radio button; the ones
+    // flagged experimental are marked in red when selected.
+    readonly property var instrumentNames: Object.keys(Core.INSTRUMENTS)
+
+    function detectPartInstrument(partIndex) {
         try {
             var part = curScore.parts[partIndex];
             var id = "";
             try { if (part.instrumentId) id += part.instrumentId; } catch (e1) {}
             try { if (part.musicXmlId) id += "|" + part.musicXmlId; } catch (e2) {}
-            if (/viola/i.test(id)) return "viola";
-            if (id) return "violin";
+            return Core.detectInstrument(id);
         } catch (e) {}
-        return "";   // unknown: caller may fall back on pitch range
+        return "";   // unknown: keep the radio selection
+    }
+
+    function setInstrument(name) {
+        if (!Core.INSTRUMENTS[name]) return;
+        activeInstrument = name;
+        if (prefs) { try { prefs.instrument = name; } catch (e) {} }
+    }
+
+    // Pre-select the radio from the chosen staff's part.
+    function instrumentForStaff() {
+        var entry = staffEntry(effectiveStaff());
+        var det = entry ? detectPartInstrument(entry.partIndex) : "";
+        if (det) activeInstrument = det;
+    }
+
+    Component.onCompleted: {
+        // Qt.labs.settings may be missing in some hosts; remembering the
+        // last instrument is optional, so create it defensively.
+        try {
+            prefs = Qt.createQmlObject(
+                'import QtQuick 2.9; import Qt.labs.settings 1.0; '
+                + 'Settings { category: "ViolinFingering"; '
+                + 'property string instrument: "violin" }', plugin, "prefs");
+            if (Core.INSTRUMENTS[prefs.instrument])
+                activeInstrument = prefs.instrument;
+        } catch (e) { prefs = null; }
+    }
+
+    // "①=E, ②=A, ③=D, ④=G" for the active instrument.
+    function stringKey() {
+        var n = activeInst.strings.tuning.length, out = [];
+        for (var i = 0; i < n; i++)
+            out.push(activeInst.strings.labels[i] + "=" + activeInst.strings.names[n - 1 - i]);
+        return out.join(", ");
     }
 
     // One dropdown entry per staff, labeled with its part name.
@@ -169,10 +251,10 @@ MuseScore {
 
     // -- score scanning ----------------------------------
     function collectEvents() {
-        // Staff comes from the dropdown; a range selection only narrows
-        // the tick window (whatever staff it was made on).
-        var staffIdx = staffModel.length
-            ? staffModel[Math.max(0, staffSelect.currentIndex)].staff : 0;
+        // A range selection decides staff and tick window; otherwise the
+        // dropdown's staff, whole.
+        sel = readSelection();
+        var staffIdx = effectiveStaff();
         var cursor = curScore.newCursor();
         cursor.rewind(Cursor.SELECTION_START);
         var endTick = -1;
@@ -202,7 +284,7 @@ MuseScore {
                         if (!a || a.type !== Element.STAFF_TEXT) continue;
                         if (a.track !== undefined && Math.floor(a.track / 4) !== staffIdx) continue;
                         var ptxt = ("" + a.text).replace(/<[^>]*>/g, "").trim();
-                        if (!/^(I|II|III|IV|V|VI|VII|VIII)$/.test(ptxt)) continue;
+                        if (!Core.isPositionMark(ptxt)) continue;
                         if (classifyAnnotation(registry, a, cursor.tick, -1, "p", ptxt) === "plugin")
                             pluginEls.push(a);
                     }
@@ -234,6 +316,10 @@ MuseScore {
                     }
                     for (var i = 0; i < el.notes.length; i++)
                         collectNote(byTick, el.notes[i], cursor.tick, false);
+                    var thumbPin = readChordThumb(el, cursor.tick);
+                    if (thumbPin >= 0 && byTick[cursor.tick] && byTick[cursor.tick][thumbPin]
+                            && byTick[cursor.tick][thumbPin].finger === null)
+                        byTick[cursor.tick][thumbPin].finger = Core.THUMB;
                 }
                 cursor.next();
             }
@@ -249,6 +335,45 @@ MuseScore {
                          grace: pitches[0].grace || false});
         }
         return events;
+    }
+
+    // The thumb-position sign is an Articulation on the chord, not text on a
+    // note. Returns the chord's thumb articulations ([] when none or when the
+    // API does not expose them).
+    function chordThumbs(chord) {
+        var out = [];
+        try {
+            var arts = chord.articulations;
+            for (var i = 0; i < arts.length; i++) {
+                var nm = "";
+                try { nm = arts[i].subtypeName(); } catch (e0) {}
+                if (Core.isThumbArticulation(arts[i].symbol, nm)) out.push(arts[i]);
+            }
+        } catch (e) {}
+        return out;
+    }
+
+    // Thumb marks of one chord, sorted: plugin-owned ones are queued for
+    // removal; a hand-made one pins the chord's lowest note to the thumb
+    // (the thumb stops the lowest string, fingers play above it) unless
+    // "replace manual fingerings" is on. Returns the pitch to pin, or -1.
+    function readChordThumb(chord, tick) {
+        var pin = -1;
+        if (!activeInst.hand.thumb) return pin;
+        var thumbs = chordThumbs(chord);
+        for (var i = 0; i < thumbs.length; i++) {
+            var cls = classifyAnnotation(registry, thumbs[i], tick, Core.THUMB_PITCH,
+                                         "f", Core.THUMB_KEY);
+            if (cls === "plugin" || overwrite.checked) {
+                pluginEls.push(thumbs[i]);
+                continue;
+            }
+            var lowest = 1000;
+            for (var n = 0; n < chord.notes.length; n++)
+                if (chord.notes[n].pitch < lowest) lowest = chord.notes[n].pitch;
+            pin = lowest;
+        }
+        return pin;
     }
 
     function collectNote(byTick, note, t, grace) {
@@ -294,12 +419,13 @@ MuseScore {
         // removal instead and never become constraints.
         var out = {string: null, finger: null, harmonic: false};
         if (!note.elements) return out;
-        var isOpenStringPitch = activeTuning.indexOf(note.pitch) >= 0;
+        var isOpenStringPitch = activeInst.strings.tuning.indexOf(note.pitch) >= 0;
         var plainDigits = [], humanEls = [];
         for (var i = 0; i < note.elements.length; i++) {
             var el = note.elements[i];
             if (el.type !== Element.FINGERING) continue;
             var txt = ("" + el.text).replace(/<[^>]*>/g, "").trim();
+            var fnum = Core.fingerFromText(txt);          // a digit, or -1
             var isString = false;
             try {
                 if (el.subStyle !== undefined && typeof Tid !== "undefined" &&
@@ -308,9 +434,10 @@ MuseScore {
             } catch (e) {}
             var kind;
             var hl = !isString && /^[0-4][LH]+$/.test(txt);
-            if (/^[0-9]$/.test(txt)) kind = isString ? "s" : "f";
+            var snum = Core.stringFromLabel(txt);         // circled string number
+            if (fnum >= 0) kind = isString ? "s" : "f";
             else if (hl) kind = "f";
-            else if (/^[①-④]$/.test(txt)) kind = "s";  // circled string number
+            else if (snum > 0) kind = "s";
             else if (/^(I|II|III|IV)$/.test(txt)) kind = "s";    // legacy plugin string mark
             else continue;
             if (classifyAnnotation(registry, el, tick, note.pitch, kind, txt) === "plugin") {
@@ -318,13 +445,13 @@ MuseScore {
                 continue;
             }
             humanEls.push(el);
-            if (/^[①-④]$/.test(txt)) {
-                out.string = txt.charCodeAt(0) - 0x2460 + 1;
+            if (snum > 0) {
+                out.string = snum;
                 continue;
             }
-            if (!/^[0-9]$/.test(txt) && !hl) continue;   // human Roman text: no constraint
-            var v = parseInt(txt);
-            if (kind === "s" && v >= 1 && v <= 4) out.string = v;
+            if (fnum < 0 && !hl) continue;   // human Roman text: no constraint
+            var v = fnum >= 0 ? fnum : parseInt(txt);
+            if (kind === "s" && v >= 1 && v <= Core.maxStrings()) out.string = v;
             else if (kind === "f") plainDigits.push(v);
         }
         var hasZero = plainDigits.indexOf(0) >= 0;
@@ -373,7 +500,7 @@ MuseScore {
     // score) and updates the registry. Manual annotations are untouched
     // unless "Replace manual fingerings too" is checked.
     function clearAnnotations() {
-        if (!curScore) { statusText.text = "No score is open"; return; }
+        if (!curScore) { statusBody = "No score is open"; return; }
         collectEvents();   // classifies annotations into pluginEls/promotedEls
         curScore.startCmd();
         for (var pr = 0; pr < promotedEls.length; pr++) {
@@ -388,12 +515,39 @@ MuseScore {
             if (!registry.consumed[q]) items.push(registry.items[q]);
         curScore.setMetaTag("violinFingering", JSON.stringify({v: 2, items: items}));
         curScore.endCmd();
-        statusText.text = "Cleared " + removed + " plugin annotation" + (removed === 1 ? "" : "s")
+        statusBody = "Cleared " + removed + " plugin annotation" + (removed === 1 ? "" : "s")
             + (items.length ? " (" + items.length + " outside the selection kept)" : "");
     }
 
+    // Adds the thumb-position sign (an Articulation) to the chord of `note`
+    // and checks it took. Returns true on success; otherwise tells the user.
+    function writeThumb(note, color) {
+        try {
+            var chord = note.parent;
+            var before = chord.articulations.length;
+            var art = newElement(Element.ARTICULATION);
+            art.symbol = Core.THUMB_SYMID;
+            art.color = color;
+            chord.add(art);
+            var arts = chord.articulations;
+            var added = arts.length === before + 1;
+            if (added) {
+                var nm = "";
+                try { nm = arts[arts.length - 1].subtypeName(); } catch (e0) {}
+                added = Core.isThumbArticulation(arts[arts.length - 1].symbol, nm);
+            }
+            if (!added) throw "the sign was not added";
+            return true;
+        } catch (e) {
+            thumbProblem = "" + e;
+            return false;
+        }
+    }
+    property string thumbProblem: ""
+
     // -- write fingering annotations ---------------------
     function writeAnnotations(events, result, key) {
+        thumbProblem = "";
         curScore.startCmd();
         // annotations the user edited are theirs now: recolor to black
         for (var pr = 0; pr < promotedEls.length; pr++) {
@@ -413,6 +567,7 @@ MuseScore {
             var st = result[i];
             if (!st || st.harmonic) { nSkip++; continue; }
             var combo = st.combo, handPos = st.pos;
+            var thumbWritten = false;
             // Write finger and string number for EACH note in the chord
             for (var j = 0; j < combo.length; j++) {
                 var s = combo[j][0], k = combo[j][1];
@@ -425,20 +580,30 @@ MuseScore {
                     // Each note of a chord labels against its own position
                     // (a fingered tenth spans two).
                     var ftxt = "" + k;
-                    if (writeHL.checked) {
+                    if (writeHL.checked && k !== Core.THUMB) {
                         var evKey = events[i].key != null ? events[i].key : key;
                         ftxt = Core.hlLabel(s, k, combo[j][2], combo[j][4],
-                                            evKey, activeTuning);
+                                            evKey, activeInst);
                     }
-                    var fing = newElement(Element.FINGERING);
-                    fing.text = ftxt;
-                    fing.color = markerColor;
-                    noteRefs[0].add(fing);
-                    newItems.push([events[i].tick, pitchInfo.midi, "f", ftxt, targetStaff]);
-                    nFing++;
+                    if (k === Core.THUMB) {
+                        // chord-level sign, once per chord
+                        if (!thumbWritten && writeThumb(noteRefs[0], markerColor)) {
+                            newItems.push([events[i].tick, Core.THUMB_PITCH, "f",
+                                           Core.THUMB_KEY, targetStaff]);
+                            thumbWritten = true;
+                            nFing++;
+                        }
+                    } else {
+                        var fing = newElement(Element.FINGERING);
+                        fing.text = ftxt;
+                        fing.color = markerColor;
+                        noteRefs[0].add(fing);
+                        newItems.push([events[i].tick, pitchInfo.midi, "f", ftxt, targetStaff]);
+                        nFing++;
+                    }
                 }
                 if (writeStrings.checked && !hadString) {
-                    var stringNum = 4 - s;
+                    var stringNum = activeInst.strings.tuning.length - s;
                     var sn = newElement(Element.FINGERING);
                     // Real string number = FINGERING with the String Number
                     // text style; MuseScore draws the circle itself.
@@ -450,7 +615,7 @@ MuseScore {
                         }
                     } catch (e3) {}
                     sn.text = styled ? "" + stringNum
-                                     : ["①","②","③","④"][stringNum - 1];
+                                     : activeInst.strings.labels[stringNum - 1];
                     sn.color = markerColor;
                     noteRefs[0].add(sn);
                     newItems.push([events[i].tick, pitchInfo.midi, "s", sn.text, targetStaff]);
@@ -483,27 +648,10 @@ MuseScore {
     }
 
     function apply() {
-        // Instrument first (readAnnotations checks open-string pitches),
-        // then a pitch-range fallback once the notes are known.
-        var entry = staffModel.length
-            ? staffModel[Math.max(0, staffSelect.currentIndex)] : null;
-        var inst = entry ? detectInstrument(entry.partIndex) : "";
-        activeInstrument = inst === "viola" ? "viola" : "violin";
-        activeTuning = activeInstrument === "viola" ? tuningViola : tuningViolin;
+        // The radio selection is authoritative (readAnnotations checks
+        // open-string pitches against its tuning).
         var events = collectEvents();
-        if (events.length === 0) { statusText.text = "No notes found"; return; }
-        if (!inst) {
-            // Unknown instrument id: notes below the violin's open G but
-            // within viola range can only mean a viola part.
-            for (var ri = 0; ri < events.length; ri++) {
-                var low = events[ri].pitches[events[ri].pitches.length - 1].midi;
-                if (low < 55 && low >= 48) {
-                    activeInstrument = "viola";
-                    activeTuning = tuningViola;
-                    break;
-                }
-            }
-        }
+        if (events.length === 0) { statusBody = "No notes found"; return; }
         var key = readKeySignature();
         // Build chord events. Events with any harmonic note become segment
         // boundaries: solved independently from neighboring segments because
@@ -532,7 +680,7 @@ MuseScore {
                         return !e.isHarmonic;
                     });
                     if (seg.length > 0) {
-                        var segResult = Core.solveChords(seg, key, 7, activeTuning);
+                        var segResult = Core.solveChords(seg, key, undefined, activeInst);
                         if (segResult) {
                             var ri = 0;
                             for (var k = segStart; k < ei; k++) {
@@ -562,32 +710,21 @@ MuseScore {
             var bad = [];
             for (var bi = 0; bi < events.length && bad.length < 10; bi++)
                 for (var bj = 0; bj < events[bi].pitches.length && bad.length < 10; bj++)
-                    if (Core.candidatesForPitch(events[bi].pitches[bj].midi, key, 7, activeTuning).length === 0)
+                    if (Core.candidatesForPitch(events[bi].pitches[bj].midi, key, undefined, activeInst).length === 0)
                         bad.push(noteName(events[bi].pitches[bj].midi) + " at tick " + events[bi].tick);
-            statusText.text = "ViolinFingering could not solve this staff (some notes outside "
+            statusBody = "ViolinFingering could not solve this staff (some notes outside "
                 + activeInstrument + " range).\n"
                 + (bad.length ? "Unplayable: " + bad.join(", ") + "\n" : "")
                 + "Report issues at https://github.com/knoguchi/violin-fingering/issues";
             return;
         }
         var stats = writeAnnotations(events, result, key);
-        // Position distribution
-        var posDist = {};
-        for (var i = 0; i < result.length; i++) {
-            var st = result[i];
-            if (!st || st.harmonic) continue;
-            var p = st.pos;
-            posDist[p] = (posDist[p] || 0) + 1;
-        }
-        var posStr = Object.keys(posDist).sort().map(function (k) {
-            return "pos" + k + ":" + posDist[k];
-        }).join(" ");
-        statusText.text = "Instrument: " + activeInstrument + " / Key: " + key + " (" + (key > 0 ? key + " sharps" : key < 0 ? (-key) + " flats" : "C major / A minor") + ")\n"
-            + "Done: " + events.length + " events processed\n"
-            + "Fingers written: " + stats.fing
-            + (writeStrings.checked ? " / strings: " + stats.str : "")
-            + (writePositions.checked ? " / positions: " + stats.pos : "")
-            + "\nPosition use: " + posStr;
+        statusBody = "Done: " + events.length + " notes, "
+            + (key > 0 ? key + " sharps" : key < 0 ? (-key) + " flats" : "no accidentals") + "\n"
+            + (thumbProblem ? "Thumb sign not written: " + thumbProblem + "\n" : "")
+            + "Fingers " + stats.fing
+            + (writeStrings.checked ? ", strings " + stats.str : "")
+            + (writePositions.checked ? ", positions " + stats.pos : "");
     }
 
     // -- UI ----------------------------------------------
@@ -597,13 +734,13 @@ MuseScore {
         spacing: 6
         Text {
             Layout.fillWidth: true
-            wrapMode: Text.Wrap
-            // Plain Text defaults to black; follow the themed Controls
-            // palette so it stays readable in dark mode.
+            wrapMode: Text.WordWrap
+            font.bold: true
             color: writeFingers.palette.windowText
-            text: "Computes violin fingering for the selection (or whole score) and writes finger numbers and position marks as annotations.\nExisting finger/string annotations are honored as constraints."
+            text: plugin.targetSummary()
         }
         RowLayout {
+            visible: !plugin.sel.has
             Layout.fillWidth: true
             Text {
                 text: "Staff:"
@@ -614,29 +751,78 @@ MuseScore {
                 Layout.fillWidth: true
                 model: staffModel
                 textRole: "text"
+                onActivated: plugin.refreshTarget()
             }
         }
-        CheckBox { id: writeFingers;   checked: true;  text: "Write left-hand finger numbers (1-4)" }
-        CheckBox { id: writeHL;        checked: false; text: "Mark finger placement (1L, 2L, 3H, 4L; unmarked = 1-23-4)" }
-        CheckBox { id: writePositions; checked: true;  text: "Write positions (Roman numerals)" }
-        CheckBox { id: writeStrings;   checked: false; text: "Write string numbers (①=E, ②=A, ③=D, ④=G)" }
-        CheckBox { id: colorize;       checked: true;  text: "Color auto-written annotations blue" }
-        CheckBox { id: overwrite;      checked: false; text: "Replace manual fingerings too (plugin's own are always replaced)" }
+        RowLayout {
+            Layout.fillWidth: true
+            Text {
+                text: "Instrument:"
+                Layout.alignment: Qt.AlignTop
+                topPadding: 10        // lines up with the first row of radios
+                color: writeFingers.palette.windowText
+            }
+            ButtonGroup { id: instrumentGroup }
+            Flow {
+                Layout.fillWidth: true
+                spacing: 4
+                Repeater {
+                    model: plugin.instrumentNames
+                    RadioButton {
+                        ButtonGroup.group: instrumentGroup
+                        text: Core.INSTRUMENTS[modelData].label
+                        checked: plugin.activeInstrument === modelData
+                        onClicked: plugin.setInstrument(modelData)
+                    }
+                }
+            }
+        }
+        Text {
+            visible: !!plugin.activeInst.experimental
+            Layout.fillWidth: true
+            wrapMode: Text.WordWrap
+            color: "#d32f2f"
+            font.bold: true
+            text: plugin.activeInst.label + " is experimental"
+        }
+        CheckBox { id: writeFingers;   checked: true;  text: "Finger numbers" }
+        CheckBox {
+            id: writeHL; checked: false; enabled: activeInst.hand.hlEnabled
+            text: "Finger placement (1L 2L 3H 4L)"
+            ToolTip.visible: hovered; ToolTip.delay: 400
+            ToolTip.text: "Suffix L/H where a finger is lower/higher than the 1-23-4 shape"
+        }
+        CheckBox { id: writePositions; checked: true;  text: "Positions (I, II, III...)" }
+        CheckBox {
+            id: writeStrings; checked: false
+            text: "String numbers"
+            ToolTip.visible: hovered; ToolTip.delay: 400
+            ToolTip.text: stringKey()
+        }
+        CheckBox { id: colorize;       checked: true;  text: "Color new marks blue" }
+        CheckBox {
+            id: overwrite; checked: false
+            text: "Replace my own fingerings"
+            ToolTip.visible: hovered; ToolTip.delay: 400
+            ToolTip.text: "Off: fingerings you wrote are kept and used as constraints"
+        }
         RowLayout {
             Button {
                 text: "Run"
                 onClicked: {
-                    statusText.text = "Running...";
+                    statusBody = "Running...";
+                    plugin.refreshTarget();
                     try { plugin.apply(); }
-                    catch (e) { statusText.text = "Exception while running: " + e + "\n" + (e.stack || "")
+                    catch (e) { statusBody = "Exception while running: " + e + "\n" + (e.stack || "")
                         + "\nPlease report: https://github.com/knoguchi/violin-fingering/issues"; }
                 }
             }
             Button {
                 text: "Clear"
                 onClicked: {
+                    plugin.refreshTarget();
                     try { plugin.clearAnnotations(); }
-                    catch (e) { statusText.text = "Exception while clearing: " + e + "\n" + (e.stack || "")
+                    catch (e) { statusBody = "Exception while clearing: " + e + "\n" + (e.stack || "")
                         + "\nPlease report: https://github.com/knoguchi/violin-fingering/issues"; }
                 }
             }
@@ -650,7 +836,7 @@ MuseScore {
             TextEdit {
                 id: statusText
                 width: parent.width
-                text: "v1.5.0 (staff selector, viola support) - Run computes fingering for the chosen staff and writes annotations; re-running replaces the plugin's own annotations while manual ones are honored as constraints. Clear removes the plugin's annotations. Issues: github.com/knoguchi/violin-fingering"
+                text: "v" + plugin.version + (plugin.statusBody ? "\n" + plugin.statusBody : "")
                 wrapMode: TextEdit.Wrap
                 readOnly: true
                 selectByMouse: true

@@ -15,6 +15,10 @@ return {keyScale: keyScale, fingerPitch: fingerPitch,
         candidatesForEvent: candidatesForEvent, solveChords: solveChords,
         chordTransCost: chordTransCost,
         hlLabel: hlLabel,
-        ROMAN: ROMAN, STRING_NAMES: STRING_NAMES,
-        TUNING: TUNING, VIOLA_TUNING: VIOLA_TUNING};
+        ROMAN: ROMAN, THUMB: THUMB, THUMB_KEY: THUMB_KEY, THUMB_PITCH: THUMB_PITCH,
+        THUMB_SYMID: THUMB_SYMID, isThumbArticulation: isThumbArticulation,
+        fingerFromText: fingerFromText, stringFromLabel: stringFromLabel,
+        maxStrings: maxStrings, isPositionMark: isPositionMark,
+        INSTRUMENTS: INSTRUMENTS, resolveInst: resolveInst,
+        detectInstrument: detectInstrument};
 `)();
