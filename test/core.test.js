@@ -786,3 +786,36 @@ test('cello: B melodic minor agrees with the teacher on C#, D, E and the last th
         });
     }
 });
+
+// G melodic minor (ascending), G2 to G4, as played by Kenji's cello teacher (relayed by Kenji,
+// taken as standard): 0 1 2 4 | 0 1 3 4 | 0 1 2 4 | 1 3 4. C4 and D4 follow a low first-finger
+// Bb (back-extended first finger), which the plugin does not model.
+test('cello: G melodic minor agrees with the teacher except C4 and D4', function () {
+    const ps   = [43, 45, 46, 48, 50, 52, 54, 55, 57, 58, 60, 62, 64, 66, 67];
+    const want = [0, 1, 2, 4, 0, 1, 3, 4, 0, 1, 2, 4, 1, 3, 4];
+    const skip = [10, 11];
+    for (const key of [-2, 0, 3]) {                                   // key signature must not matter
+        const res = core.solveChords(melody(ps), key, 20, 'cello');
+        assert.ok(res);
+        res.forEach(function (r, i) {
+            if (skip.indexOf(i) >= 0) return;
+            assert.strictEqual(r.combo[0][FING], want[i], 'finger of note ' + i + ', key ' + key);
+        });
+    }
+});
+
+// F# melodic minor (ascending), F#2 to F#4, as played by Kenji's cello teacher (relayed by
+// Kenji, taken as standard): 2 4 1 2 4 1 3 4 1 2 4 1 3 3 4. The first eight notes are the
+// shifting shape of F# major, which the solver does not reproduce; only the last two notes
+// (E#4 with 3, F#4 with 4) are asserted.
+test('cello: F# melodic minor agrees with the teacher on the last two notes', function () {
+    const ps   = [42, 44, 45, 47, 49, 51, 53, 54, 56, 57, 59, 61, 63, 65, 66];
+    const want = [2, 4, 1, 2, 4, 1, 3, 4, 1, 2, 4, 1, 3, 3, 4];
+    for (const key of [3, 0, -2]) {                                   // key signature must not matter
+        const res = core.solveChords(melody(ps), key, 20, 'cello');
+        assert.ok(res);
+        [13, 14].forEach(function (i) {
+            assert.strictEqual(res[i].combo[0][FING], want[i], 'finger of note ' + i + ', key ' + key);
+        });
+    }
+});
