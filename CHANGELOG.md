@@ -4,8 +4,7 @@
 
 - Selection wins: a range selection decides the staff (its first) and the
   tick range; the Staff dropdown shows only with no selection. A summary
-  line names the target; Instrument and Experimental options are in a
-  collapsed section.
+  line names the target.
 - Per-instrument config: all tuning, hand-frame geometry and cost weights
   moved into `INSTRUMENTS` (violin, viola, cello) in the core; functions
   take an instrument name/config instead of a bare tuning. Violin and
@@ -25,10 +24,9 @@
   and the 5-string violin's fifth string being left behind).
 - Instrument radio buttons, pre-selected from the part and remembered
   between runs. String-number key follows the instrument.
-- Cello and a 5-string violin (C-G-D-A-E) are experimental: hidden unless
-  "Experimental instruments" is ticked in the dialog (remembered). A part
-  detected as cello while that is off shows a hint instead of being
-  fingered as a violin.
+- Cello and a 5-string violin (C-G-D-A-E) are offered next to Violin and
+  Viola; the dialog shows "<instrument> is experimental" in red while one
+  is selected.
 
 - Finger placement indicators (#4): optional `1L`/`2L`/`3H`/`4L` suffixes
   on finger numbers, relative to the 1-23-4 hand shape. First position is

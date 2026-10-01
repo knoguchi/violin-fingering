@@ -40,12 +40,12 @@ the **Staff** dropdown picks the staff and the whole staff is processed.
 One staff at a time: if the selection spans several staves, the first is
 used (the dialog says so); repeat per part in a multi-part score.
 
-The staff's instrument is pre-selected from the part. Open **Instrument**
-in the dialog to override it (Violin / Viola; the last choice is
+The staff's instrument is pre-selected from the part. Use the **Instrument**
+radio buttons in the dialog to override it (the last choice is
 remembered). Viola uses C-G-D-A tuning with the same hand model a fifth
-lower. Tick **Experimental instruments** there to also get Cello (a
-chromatic, semitone-per-finger hand frame) and a 5-string violin
-(C-G-D-A-E).
+lower. Cello (a chromatic, semitone-per-finger hand frame) and a
+5-string violin (C-G-D-A-E) are also offered; the dialog marks them
+"experimental" in red.
 
 
 - **Run**: computes fingering for the selected measures (or the whole staff) and writes

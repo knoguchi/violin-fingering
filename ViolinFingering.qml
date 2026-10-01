@@ -44,7 +44,6 @@ MuseScore {
     // {has, staff, nStaves} describing the current range selection.
     property var sel: ({has: false, staff: 0, nStaves: 0})
     property int lastStaff: -1
-    property bool advancedOpen: false
 
     function readSelection() {
         var out = {has: false, staff: 0, nStaves: 0};
@@ -98,22 +97,9 @@ MuseScore {
     readonly property var activeInst: Core.INSTRUMENTS[activeInstrument]
     property var prefs: null
 
-    // Instruments flagged experimental in Core.INSTRUMENTS (cello, 5-string
-    // violin) are offered only while this is on; it is remembered (prefs).
-    property bool experimental: false
-    // Detected instrument of the chosen part that is switched off, for the hint.
-    property string blockedInstrument: ""
-    readonly property var instrumentChoices: {
-        var out = [];
-        for (var n in Core.INSTRUMENTS)
-            if (experimental || !Core.INSTRUMENTS[n].experimental) out.push(n);
-        return out;
-    }
-
-    function isAvailable(name) {
-        var inst = Core.INSTRUMENTS[name];
-        return !!inst && (experimental || !inst.experimental);
-    }
+    // Every instrument in Core.INSTRUMENTS gets a radio button; the ones
+    // flagged experimental are marked in red when selected.
+    readonly property var instrumentNames: Object.keys(Core.INSTRUMENTS)
 
     function detectPartInstrument(partIndex) {
         try {
@@ -127,25 +113,16 @@ MuseScore {
     }
 
     function setInstrument(name) {
-        if (!isAvailable(name)) return;
+        if (!Core.INSTRUMENTS[name]) return;
         activeInstrument = name;
         if (prefs) { try { prefs.instrument = name; } catch (e) {} }
-    }
-
-    function setExperimental(on) {
-        experimental = on;
-        if (prefs) { try { prefs.experimental = on; } catch (e) {} }
-        if (!isAvailable(activeInstrument)) activeInstrument = "violin";
-        instrumentForStaff();
     }
 
     // Pre-select the radio from the chosen staff's part.
     function instrumentForStaff() {
         var entry = staffEntry(effectiveStaff());
         var det = entry ? detectPartInstrument(entry.partIndex) : "";
-        blockedInstrument = "";
-        if (det && isAvailable(det)) activeInstrument = det;
-        else if (det) blockedInstrument = det;
+        if (det) activeInstrument = det;
     }
 
     Component.onCompleted: {
@@ -155,10 +132,8 @@ MuseScore {
             prefs = Qt.createQmlObject(
                 'import QtQuick 2.9; import Qt.labs.settings 1.0; '
                 + 'Settings { category: "ViolinFingering"; '
-                + 'property string instrument: "violin"; '
-                + 'property bool experimental: false }', plugin, "prefs");
-            experimental = prefs.experimental;
-            if (isAvailable(prefs.instrument))
+                + 'property string instrument: "violin" }', plugin, "prefs");
+            if (Core.INSTRUMENTS[prefs.instrument])
                 activeInstrument = prefs.instrument;
         } catch (e) { prefs = null; }
     }
@@ -797,23 +772,20 @@ MuseScore {
                 onActivated: plugin.refreshTarget()
             }
         }
-        Button {
-            flat: true
-            text: (plugin.advancedOpen ? "\u25be" : "\u25b8") + " Instrument"
-            onClicked: plugin.advancedOpen = !plugin.advancedOpen
-        }
-        ColumnLayout {
-            visible: plugin.advancedOpen
+        RowLayout {
             Layout.fillWidth: true
-            RowLayout {
+            Text {
+                text: "Instrument:"
+                Layout.alignment: Qt.AlignTop
+                topPadding: 10        // lines up with the first row of radios
+                color: writeFingers.palette.windowText
+            }
+            ButtonGroup { id: instrumentGroup }
+            Flow {
                 Layout.fillWidth: true
-                Text {
-                    text: "Instrument:"
-                    color: writeFingers.palette.windowText
-                }
-                ButtonGroup { id: instrumentGroup }
+                spacing: 4
                 Repeater {
-                    model: plugin.instrumentChoices
+                    model: plugin.instrumentNames
                     RadioButton {
                         ButtonGroup.group: instrumentGroup
                         text: Core.INSTRUMENTS[modelData].label
@@ -822,21 +794,14 @@ MuseScore {
                     }
                 }
             }
-            CheckBox {
-                id: experimentalOpt
-                checked: plugin.experimental
-                text: "Experimental instruments (cello, 5-string violin)"
-                onClicked: plugin.setExperimental(checked)
-            }
         }
         Text {
-            visible: plugin.blockedInstrument !== ""
+            visible: !!plugin.activeInst.experimental
             Layout.fillWidth: true
             wrapMode: Text.WordWrap
-            color: writeFingers.palette.windowText
-            text: "This part looks like a " + (plugin.blockedInstrument
-                  ? Core.INSTRUMENTS[plugin.blockedInstrument].label.toLowerCase() : "")
-                  + "; enable experimental instruments to use it."
+            color: "#d32f2f"
+            font.bold: true
+            text: plugin.activeInst.label + " is experimental"
         }
         CheckBox { id: writeFingers;   checked: true;  text: "Write left-hand finger numbers (1-4)" }
         CheckBox { id: writeHL;        checked: false; enabled: activeInst.hand.hlEnabled; text: "Mark finger placement (1L, 2L, 3H, 4L; unmarked = 1-23-4)" }
