@@ -302,9 +302,10 @@ var INSTRUMENTS = {
                 posSpread: 0.25,
                 chordPosSpan: 2,
                 chordPosSpanPair: 4,
+                // Cost of departing from the cello key map (CELLO_KEY_MAP).
+                keyMap: 0.2,
                 // Fourth finger is rarely used in the lower positions and almost
                 // never up the neck; third thins out too (1/2 dominate high up).
-                keyMap: 0.2,
                 // The 5th entry is the thumb (see hand.thumb for when it
                 // may compete at all).
                 fingerCost: [0, 0, 0.05, 0.2, 0.5],
@@ -522,8 +523,6 @@ function posCost(inst, p) {
 
 // --- chord-aware (multi-note per event) ---------------
 
-// 1 when the instrument has a key map entry for this pitch and the candidate
-// (string, finger) is not among its choices; 0 otherwise.
 // Mode of each key signature in use, read from the notes: a melodic minor has the
 // raised seventh of the relative minor, a pitch class outside the major scale.
 function keyModes(events, key) {
@@ -541,6 +540,8 @@ function keyModes(events, key) {
     return modes;
 }
 
+// 1 when the instrument has a key map entry for this pitch and the candidate
+// (string, finger) is not among its choices; 0 otherwise.
 function keyMapMiss(km, cand) {
     var opts = km && km[cand[4]];
     if (!opts) return 0;
