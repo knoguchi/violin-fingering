@@ -519,3 +519,27 @@ test('cello: C major scale across all four strings is 0 1 3 4 | 0 1 3 4 | 0 1 2 
         res.forEach(function (r, i) { assert.strictEqual(r.pos, 1, 'note ' + i + ' position'); });
     }
 });
+
+// D major, two octaves, first position, as supplied by Kenji:
+//   C string D E F# = 1 2 4 | G string G A B C# = 0 1 2 4 | D string 0 1 3 4 | A string 0 1 3 4
+// The C and G string groups use the open hand (extension: whole tones between
+// fingers 1, 2 and 4), which the plugin's closed-hand frame cannot express yet.
+const D_MAJOR = [38, 40, 42, 43, 45, 47, 49, 50, 52, 54, 55, 57, 59, 61, 62];
+
+test('cello: D major on the D and A strings is 0 1 3 4 | 0 1 3 4, first position', function () {
+    const res = core.solveChords(melody(D_MAJOR.slice(7)), 2, 20, 'cello');
+    assert.ok(res);
+    assert.deepStrictEqual(res.map(function (r) { return r.combo[0][FING]; }),
+                           [0, 1, 3, 4, 0, 1, 3, 4]);
+    res.forEach(function (r) { assert.strictEqual(r.pos, 1); });
+});
+
+test('cello: D major over two octaves with the open hand (extension) is 1 2 4 | 0 1 2 4 | 0 1 3 4 | 0 1 3 4',
+     {todo: 'needs the open-hand (extension) frame: E and B come out as finger 3 and F#/C# shift to II'},
+     function () {
+    const res = core.solveChords(melody(D_MAJOR), 2, 20, 'cello');
+    assert.ok(res);
+    assert.deepStrictEqual(res.map(function (r) { return r.combo[0][FING]; }),
+                           [1, 2, 4, 0, 1, 2, 4, 0, 1, 3, 4, 0, 1, 3, 4]);
+    res.forEach(function (r, i) { assert.strictEqual(r.pos, 1, 'note ' + i); });
+});
