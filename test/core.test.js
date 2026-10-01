@@ -733,3 +733,21 @@ test('cello: A melodic minor agrees with the teacher except the open-hand notes'
         });
     }
 });
+
+// E melodic minor (ascending), two octaves, as played by Kenji's cello teacher (relayed by
+// Kenji, taken as standard): 2 4 0 1 2 4 1 2 4 1 2 4 1 3 4.
+// B2 is the open hand; from F#3 on the teacher repeats a shifting 1-2-4 shape (like E, F#
+// and B major), which the solver does not reproduce.
+test('cello: E melodic minor agrees with the teacher on the opening and the last two notes', function () {
+    const ps   = [40, 42, 43, 45, 47, 49, 51, 52, 54, 55, 57, 59, 61, 63, 64];
+    const want = [2, 4, 0, 1, 2, 4, 1, 2, 4, 1, 2, 4, 1, 3, 4];
+    const skip = [4, 8, 9, 10, 11, 12];
+    for (const key of [1, 0, -3]) {                                   // key signature must not matter
+        const res = core.solveChords(melody(ps), key, 20, 'cello');
+        assert.ok(res);
+        res.forEach(function (r, i) {
+            if (skip.indexOf(i) >= 0) return;
+            assert.strictEqual(r.combo[0][FING], want[i], 'finger of note ' + i + ', key ' + key);
+        });
+    }
+});
