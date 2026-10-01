@@ -120,6 +120,14 @@ function resolveInst(x) {
         hlEnabled: true, maxPosition: 7});
 }
 
+// Instrument for a part's id string (MuseScore instrumentId / musicXmlId),
+// or "" when unrecognized.
+function detectInstrument(id) {
+    for (var n in INSTRUMENTS)
+        if (INSTRUMENTS[n].detect.test(id || "")) return n;
+    return "";
+}
+
 // Kept for callers that predate INSTRUMENTS.
 var TUNING = INSTRUMENTS.violin.tuning;
 var VIOLA_TUNING = INSTRUMENTS.viola.tuning;

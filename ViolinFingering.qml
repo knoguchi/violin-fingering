@@ -3,11 +3,11 @@
 // License: GPL-3.0 (see LICENSE)
 // https://github.com/knoguchi/violin-fingering
 //
-// Computes (string, finger, position) for every note of a violin or viola
+// Computes (string, finger, position) for every note of a violin, viola or cello
 // staff using position-aware Viterbi dynamic programming, and writes finger
 // numbers and position marks as annotations. The staff is chosen in the
-// dialog; its instrument (violin G3 D4 A4 E5 / viola C3 G3 D4 A4) is
-// detected from the part. The key signature is read from the score and
+// dialog; its instrument (violin, viola or cello, per the radio buttons) is
+// pre-selected from the part. The key signature is read from the score and
 // determines the finger layout at each (string, position).
 
 import QtQuick
@@ -24,7 +24,7 @@ MuseScore {
     categoryCode: "composing-arranging-tools"
     pluginType: "dialog"
     width: 420
-    height: 500
+    height: 530
 
     onRun: {
         if (!curScore) {
@@ -38,6 +38,7 @@ MuseScore {
         var defStaff = c.segment ? c.staffIdx : 0;
         for (var i = 0; i < staffModel.length; i++)
             if (staffModel[i].staff === defStaff) { staffSelect.currentIndex = i; break; }
+        instrumentForStaff();
     }
 
     // The staff being processed: chosen in the dialog's staff dropdown.
@@ -45,25 +46,58 @@ MuseScore {
     property int targetStaff: 0
     property var staffModel: []
 
-    // Instrument of the chosen staff: violin (default) or viola. Detected
-    // from the part's instrument id, with a pitch-range fallback (notes
-    // below the violin's open G but within viola range). Same hand model,
-    // one fifth lower.
-    property var tuningViolin: [55, 62, 69, 76]
-    property var tuningViola: [48, 55, 62, 69]
-    property var activeTuning: [55, 62, 69, 76]
+    // Instrument being fingered: the Violin/Viola/Cello radio buttons. The
+    // staff dropdown pre-selects it from the part's instrument id; the
+    // last choice is remembered (see prefs) for parts with unknown ids.
+    // All geometry and cost weights come from Core.INSTRUMENTS.
     property string activeInstrument: "violin"
+    readonly property var activeInst: Core.INSTRUMENTS[activeInstrument]
+    property var prefs: null
 
-    function detectInstrument(partIndex) {
+    function detectPartInstrument(partIndex) {
         try {
             var part = curScore.parts[partIndex];
             var id = "";
             try { if (part.instrumentId) id += part.instrumentId; } catch (e1) {}
             try { if (part.musicXmlId) id += "|" + part.musicXmlId; } catch (e2) {}
-            if (/viola/i.test(id)) return "viola";
-            if (id) return "violin";
+            return Core.detectInstrument(id);
         } catch (e) {}
-        return "";   // unknown: caller may fall back on pitch range
+        return "";   // unknown: keep the radio selection
+    }
+
+    function setInstrument(name) {
+        if (!Core.INSTRUMENTS[name]) return;
+        activeInstrument = name;
+        if (prefs) { try { prefs.instrument = name; } catch (e) {} }
+    }
+
+    // Pre-select the radio from the chosen staff's part.
+    function instrumentForStaff() {
+        var entry = staffModel.length
+            ? staffModel[Math.max(0, staffSelect.currentIndex)] : null;
+        var det = entry ? detectPartInstrument(entry.partIndex) : "";
+        if (det) activeInstrument = det;
+    }
+
+    Component.onCompleted: {
+        // Qt.labs.settings may be missing in some hosts; remembering the
+        // last instrument is optional, so create it defensively.
+        try {
+            prefs = Qt.createQmlObject(
+                'import QtQuick 2.9; import Qt.labs.settings 1.0; '
+                + 'Settings { category: "ViolinFingering"; '
+                + 'property string instrument: "violin" }', plugin, "prefs");
+            if (Core.INSTRUMENTS[prefs.instrument])
+                activeInstrument = prefs.instrument;
+        } catch (e) { prefs = null; }
+    }
+
+    // "①=E, ②=A, ③=D, ④=G" for the active instrument.
+    function stringKey() {
+        var n = activeInst.tuning.length, out = [];
+        for (var i = 0; i < n; i++)
+            out.push(activeInst.stringLabels[i] + "=" + activeInst.stringNames[n - 1 - i]);
+        return out.join(", ");
     }
 
     // One dropdown entry per staff, labeled with its part name.
@@ -294,7 +328,7 @@ MuseScore {
         // removal instead and never become constraints.
         var out = {string: null, finger: null, harmonic: false};
         if (!note.elements) return out;
-        var isOpenStringPitch = activeTuning.indexOf(note.pitch) >= 0;
+        var isOpenStringPitch = activeInst.tuning.indexOf(note.pitch) >= 0;
         var plainDigits = [], humanEls = [];
         for (var i = 0; i < note.elements.length; i++) {
             var el = note.elements[i];
@@ -428,7 +462,7 @@ MuseScore {
                     if (writeHL.checked) {
                         var evKey = events[i].key != null ? events[i].key : key;
                         ftxt = Core.hlLabel(s, k, combo[j][2], combo[j][4],
-                                            evKey, activeTuning);
+                                            evKey, activeInst);
                     }
                     var fing = newElement(Element.FINGERING);
                     fing.text = ftxt;
@@ -438,7 +472,7 @@ MuseScore {
                     nFing++;
                 }
                 if (writeStrings.checked && !hadString) {
-                    var stringNum = 4 - s;
+                    var stringNum = activeInst.tuning.length - s;
                     var sn = newElement(Element.FINGERING);
                     // Real string number = FINGERING with the String Number
                     // text style; MuseScore draws the circle itself.
@@ -450,7 +484,7 @@ MuseScore {
                         }
                     } catch (e3) {}
                     sn.text = styled ? "" + stringNum
-                                     : ["①","②","③","④"][stringNum - 1];
+                                     : activeInst.stringLabels[stringNum - 1];
                     sn.color = markerColor;
                     noteRefs[0].add(sn);
                     newItems.push([events[i].tick, pitchInfo.midi, "s", sn.text, targetStaff]);
@@ -483,27 +517,10 @@ MuseScore {
     }
 
     function apply() {
-        // Instrument first (readAnnotations checks open-string pitches),
-        // then a pitch-range fallback once the notes are known.
-        var entry = staffModel.length
-            ? staffModel[Math.max(0, staffSelect.currentIndex)] : null;
-        var inst = entry ? detectInstrument(entry.partIndex) : "";
-        activeInstrument = inst === "viola" ? "viola" : "violin";
-        activeTuning = activeInstrument === "viola" ? tuningViola : tuningViolin;
+        // The radio selection is authoritative (readAnnotations checks
+        // open-string pitches against its tuning).
         var events = collectEvents();
         if (events.length === 0) { statusText.text = "No notes found"; return; }
-        if (!inst) {
-            // Unknown instrument id: notes below the violin's open G but
-            // within viola range can only mean a viola part.
-            for (var ri = 0; ri < events.length; ri++) {
-                var low = events[ri].pitches[events[ri].pitches.length - 1].midi;
-                if (low < 55 && low >= 48) {
-                    activeInstrument = "viola";
-                    activeTuning = tuningViola;
-                    break;
-                }
-            }
-        }
         var key = readKeySignature();
         // Build chord events. Events with any harmonic note become segment
         // boundaries: solved independently from neighboring segments because
@@ -532,7 +549,7 @@ MuseScore {
                         return !e.isHarmonic;
                     });
                     if (seg.length > 0) {
-                        var segResult = Core.solveChords(seg, key, 7, activeTuning);
+                        var segResult = Core.solveChords(seg, key, undefined, activeInst);
                         if (segResult) {
                             var ri = 0;
                             for (var k = segStart; k < ei; k++) {
@@ -562,7 +579,7 @@ MuseScore {
             var bad = [];
             for (var bi = 0; bi < events.length && bad.length < 10; bi++)
                 for (var bj = 0; bj < events[bi].pitches.length && bad.length < 10; bj++)
-                    if (Core.candidatesForPitch(events[bi].pitches[bj].midi, key, 7, activeTuning).length === 0)
+                    if (Core.candidatesForPitch(events[bi].pitches[bj].midi, key, undefined, activeInst).length === 0)
                         bad.push(noteName(events[bi].pitches[bj].midi) + " at tick " + events[bi].tick);
             statusText.text = "ViolinFingering could not solve this staff (some notes outside "
                 + activeInstrument + " range).\n"
@@ -601,7 +618,7 @@ MuseScore {
             // Plain Text defaults to black; follow the themed Controls
             // palette so it stays readable in dark mode.
             color: writeFingers.palette.windowText
-            text: "Computes violin fingering for the selection (or whole score) and writes finger numbers and position marks as annotations.\nExisting finger/string annotations are honored as constraints."
+            text: "Computes fingering for the selection (or whole score) and writes finger numbers and position marks as annotations.\nExisting finger/string annotations are honored as constraints."
         }
         RowLayout {
             Layout.fillWidth: true
@@ -614,12 +631,30 @@ MuseScore {
                 Layout.fillWidth: true
                 model: staffModel
                 textRole: "text"
+                onActivated: plugin.instrumentForStaff()
+            }
+        }
+        RowLayout {
+            Layout.fillWidth: true
+            Text {
+                text: "Instrument:"
+                color: writeFingers.palette.windowText
+            }
+            ButtonGroup { id: instrumentGroup }
+            Repeater {
+                model: ["violin", "viola", "cello"]
+                RadioButton {
+                    ButtonGroup.group: instrumentGroup
+                    text: modelData.charAt(0).toUpperCase() + modelData.slice(1)
+                    checked: plugin.activeInstrument === modelData
+                    onClicked: plugin.setInstrument(modelData)
+                }
             }
         }
         CheckBox { id: writeFingers;   checked: true;  text: "Write left-hand finger numbers (1-4)" }
-        CheckBox { id: writeHL;        checked: false; text: "Mark finger placement (1L, 2L, 3H, 4L; unmarked = 1-23-4)" }
+        CheckBox { id: writeHL;        checked: false; enabled: activeInst.hlEnabled; text: "Mark finger placement (1L, 2L, 3H, 4L; unmarked = 1-23-4)" }
         CheckBox { id: writePositions; checked: true;  text: "Write positions (Roman numerals)" }
-        CheckBox { id: writeStrings;   checked: false; text: "Write string numbers (①=E, ②=A, ③=D, ④=G)" }
+        CheckBox { id: writeStrings;   checked: false; text: "Write string numbers (" + stringKey() + ")" }
         CheckBox { id: colorize;       checked: true;  text: "Color auto-written annotations blue" }
         CheckBox { id: overwrite;      checked: false; text: "Replace manual fingerings too (plugin's own are always replaced)" }
         RowLayout {
