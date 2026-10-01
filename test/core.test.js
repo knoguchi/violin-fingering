@@ -819,3 +819,18 @@ test('cello: F# melodic minor agrees with the teacher on the last two notes', fu
         });
     }
 });
+
+// C melodic minor (ascending), C2 to C4, as played by Kenji's cello teacher (relayed by Kenji,
+// taken as standard): 0 1 2 4 | 0 1 3 4 | 0 1 2 4 | 0 1 2. The Eb on the D string is a low first
+// finger followed by F with 2; the plugin gets this one through half position.
+test('cello: C melodic minor across the four strings matches the teacher exactly', function () {
+    const ps   = [36, 38, 39, 41, 43, 45, 47, 48, 50, 51, 53, 55, 57, 59, 60];
+    const want = [0, 1, 2, 4, 0, 1, 3, 4, 0, 1, 2, 4, 0, 1, 2];
+    const strs = [0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3];       // C C C C G G G G D D D D A A A
+    for (const key of [-3, 0, 2]) {                                   // key signature must not matter
+        const res = core.solveChords(melody(ps), key, 20, 'cello');
+        assert.ok(res);
+        assert.deepStrictEqual(res.map(function (r) { return r.combo[0][FING]; }), want, 'fingers, key ' + key);
+        assert.deepStrictEqual(res.map(function (r) { return r.combo[0][STR]; }), strs, 'strings, key ' + key);
+    }
+});
