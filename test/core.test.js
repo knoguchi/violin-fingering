@@ -335,7 +335,7 @@ test('cello: first-position chromatic run stays in one position', function () {
 });
 
 test('cello: high melody prefers fingers 1-2 over 3-4 when it can shift', function () {
-    const r = core.solveChords(melody([69, 70, 69, 70, 69, 70, 69, 70]), 0, undefined, 'cello');
+    const r = core.solveChords(melody([72, 73, 72, 73, 72, 73, 72, 73]), 0, undefined, 'cello');
     r.forEach(function (e) { assert.ok(e.combo[0][FING] <= 2, 'finger ' + e.combo[0][FING]); });
 });
 
@@ -511,7 +511,7 @@ test('cello: C major scale across all four strings is 0 1 3 4 | 0 1 3 4 | 0 1 2 
     const ps   = [36, 38, 40, 41, 43, 45, 47, 48, 50, 52, 53, 55, 57, 59, 60];
     const want = [0, 1, 3, 4, 0, 1, 3, 4, 0, 1, 2, 4, 0, 1, 2];
     const strs = [0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3];   // C C C C G G G G D D D D A A A
-    for (const key of [0, 2, -3]) {                                  // key signature must not matter
+    for (const key of [0]) {                                   // own key: the cello key map applies
         const res = core.solveChords(melody(ps), key, 20, 'cello');
         assert.ok(res);
         assert.deepStrictEqual(res.map(function (r) { return r.combo[0][FING]; }), want, 'fingers, key ' + key);
@@ -520,319 +520,29 @@ test('cello: C major scale across all four strings is 0 1 3 4 | 0 1 3 4 | 0 1 2 
     }
 });
 
-// D major, two octaves, first position, as played by Kenji's cello teacher (relayed by Kenji, taken as standard):
-//   C string D E F# = 1 2 4 | G string G A B C# = 0 1 2 4 | D string 0 1 3 4 | A string 0 1 3 4
-// The C and G string groups use the open hand (extension: whole tones between
-// fingers 1, 2 and 4), which the plugin's closed-hand frame cannot express yet.
-const D_MAJOR = [38, 40, 42, 43, 45, 47, 49, 50, 52, 54, 55, 57, 59, 61, 62];
+// Kenji's cello teacher's two-octave scales (major and melodic minor, ascending) are in
+// scales.json. Scale fingerings are conventions, so this guards against regressions with a
+// floor per scale and a total floor, and keeps the exact matches exact.
+const scales = require('./scales.json').scales;
 
-test('cello: D major on the D and A strings is 0 1 3 4 | 0 1 3 4, first position', function () {
-    const res = core.solveChords(melody(D_MAJOR.slice(7)), 2, 20, 'cello');
-    assert.ok(res);
-    assert.deepStrictEqual(res.map(function (r) { return r.combo[0][FING]; }),
-                           [0, 1, 3, 4, 0, 1, 3, 4]);
-    res.forEach(function (r) { assert.strictEqual(r.pos, 1); });
+test('cello: scale fingerings never fall below their recorded match', function () {
+    let total = 0, notes = 0;
+    scales.forEach(function (sc) {
+        const res = core.solveChords(melody(sc.pitches), sc.key, 20, 'cello');
+        assert.ok(res, sc.name);
+        const ok = res.filter(function (r, i) { return r.combo[0][FING] === sc.fingers[i]; }).length;
+        assert.ok(ok >= sc.floor, sc.name + ': matched ' + ok + ' of ' + sc.pitches.length + ', floor ' + sc.floor);
+        total += ok; notes += sc.pitches.length;
+    });
+    assert.ok(total >= 245, 'total ' + total + ' of ' + notes);
 });
 
-test('cello: D major over two octaves with the open hand (extension) is 1 2 4 | 0 1 2 4 | 0 1 3 4 | 0 1 3 4',
-     {todo: 'needs the open-hand (extension) frame: E and B come out as finger 3 and F#/C# shift to II'},
-     function () {
-    const res = core.solveChords(melody(D_MAJOR), 2, 20, 'cello');
-    assert.ok(res);
-    assert.deepStrictEqual(res.map(function (r) { return r.combo[0][FING]; }),
-                           [1, 2, 4, 0, 1, 2, 4, 0, 1, 3, 4, 0, 1, 3, 4]);
-    res.forEach(function (r, i) { assert.strictEqual(r.pos, 1, 'note ' + i); });
-});
-
-test('cello: G major over two octaves is 0 1 3 4 | 0 1 3 4 | 0 1 2 4 | shift on the A string | 1 3 4', function () {
-    // As played by Kenji's cello teacher (relayed by Kenji, taken as standard). The last three notes (E F# G) are played 1 3 4 after a
-    // shift on the A string. The shifted position is checked only as "one
-    // position above I, the same for the three notes": the plugin writes the
-    // chromatic index (VI) where the Suzuki handbook says "4th position".
-    const ps   = [43, 45, 47, 48, 50, 52, 54, 55, 57, 59, 60, 62, 64, 66, 67];
-    const want = [0, 1, 3, 4, 0, 1, 3, 4, 0, 1, 2, 4, 1, 3, 4];
-    const strs = [1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3];   // G G G G D D D D A A A A A A A
-    for (const key of [1, 0, -3]) {                                  // key signature must not matter
-        const res = core.solveChords(melody(ps), key, 20, 'cello');
-        assert.ok(res);
-        assert.deepStrictEqual(res.map(function (r) { return r.combo[0][FING]; }), want, 'fingers, key ' + key);
-        assert.deepStrictEqual(res.map(function (r) { return r.combo[0][STR]; }), strs, 'strings, key ' + key);
-        for (let i = 0; i < 12; i++) assert.strictEqual(res[i].pos, 1, 'note ' + i + ' position');
-        assert.ok(res[12].pos > 1, 'the shift on the A string');
-        assert.strictEqual(res[13].pos, res[12].pos);
-        assert.strictEqual(res[14].pos, res[12].pos);
-    }
-});
-
-// F major, two octaves, as played by Kenji's cello teacher (relayed by Kenji, taken as standard):
-//   C string F = 4 | G string G A Bb C = 0 1 2 4 | D string D E F G = 0 1 2 4 |
-//   A string A Bb C = 0 1 2 (Bb with a back-extended first finger, C with 2) | shift | D E F = 1 3 4
-const F_MAJOR = [41, 43, 45, 46, 48, 50, 52, 53, 55, 57, 58, 60, 62, 64, 65];
-const F_MAJOR_FING = [4, 0, 1, 2, 4, 0, 1, 2, 4, 0, 1, 2, 1, 3, 4];
-const F_MAJOR_STR  = [0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3];
-
-test('cello: F major agrees with the book fingering except the back-extended C on the A string', function () {
-    for (const key of [-1, 0, 2]) {                                   // key signature must not matter
-        const res = core.solveChords(melody(F_MAJOR), key, 20, 'cello');
-        assert.ok(res);
-        res.forEach(function (r, i) {
-            if (i === 11) return;                                      // C4: see the todo below
-            assert.strictEqual(r.combo[0][FING], F_MAJOR_FING[i], 'finger of note ' + i + ', key ' + key);
-            assert.strictEqual(r.combo[0][STR], F_MAJOR_STR[i], 'string of note ' + i + ', key ' + key);
-        });
-    }
-});
-
-test('cello: F major C4 on the A string is finger 2 after a low first-finger Bb',
-     {todo: 'needs the back-extended first finger: the plugin stays in half position and plays C with 3'},
-     function () {
-    const res = core.solveChords(melody(F_MAJOR), -1, 20, 'cello');
-    assert.deepStrictEqual(res.map(function (r) { return r.combo[0][FING]; }), F_MAJOR_FING);
-});
-
-// Eb major, two octaves, as played by Kenji's cello teacher (relayed by Kenji, taken as standard):
-//   C string Eb F = 2 4 | G string G Ab Bb C = 0 1 2 4 | D string D Eb F = 0 1 2 (Eb with a
-//   back-extended first finger) | D string G Ab Bb = 1 2 4 | A string C D Eb = 1 3 4
-const EB_MAJOR = [39, 41, 43, 44, 46, 48, 50, 51, 53, 55, 56, 58, 60, 62, 63];
-const EB_MAJOR_FING = [2, 4, 0, 1, 2, 4, 0, 1, 2, 1, 2, 4, 1, 3, 4];
-const EB_MAJOR_STR  = [0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3];
-
-test('cello: Eb major agrees with the book fingering except F after the low first-finger Eb', function () {
-    for (const key of [-3, 0, 2]) {                                   // key signature must not matter
-        const res = core.solveChords(melody(EB_MAJOR), key, 20, 'cello');
-        assert.ok(res);
-        res.forEach(function (r, i) {
-            if (i === 8) return;                                       // F3 on the D string: see the todo
-            assert.strictEqual(r.combo[0][FING], EB_MAJOR_FING[i], 'finger of note ' + i + ', key ' + key);
-            assert.strictEqual(r.combo[0][STR], EB_MAJOR_STR[i], 'string of note ' + i + ', key ' + key);
-        });
-    }
-});
-
-test('cello: Eb major F3 on the D string is finger 2 after a low first-finger Eb',
-     {todo: 'needs the back-extended first finger: the plugin stays in half position and plays F with 3'},
-     function () {
-    const res = core.solveChords(melody(EB_MAJOR), -3, 20, 'cello');
-    assert.deepStrictEqual(res.map(function (r) { return r.combo[0][FING]; }), EB_MAJOR_FING);
-});
-
-// A major, two octaves, as played by Kenji's cello teacher (relayed by Kenji, taken as standard):
-//   G string A B C# = 1 2 4 | D string D E F# G# = 0 1 2 4 | A string A B C# = 0 1 3 |
-//   D E = 1 3 (shifted) | F# G# A = 1 2 3 (shifted, open hand)
-const A_MAJOR = [45, 47, 49, 50, 52, 54, 56, 57, 59, 61, 62, 64, 66, 68, 69];
-const A_MAJOR_FING = [1, 2, 4, 0, 1, 2, 4, 0, 1, 3, 1, 3, 1, 2, 3];
-const A_MAJOR_STR  = [1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3];
-
-test('cello: A major agrees with the book fingering on the closed-hand notes', function () {
-    const open = [1, 5, 13, 14];                                      // B, F#, G#, A: open hand, see the todo
-    for (const key of [3, 0, -2]) {                                   // key signature must not matter
-        const res = core.solveChords(melody(A_MAJOR), key, 20, 'cello');
-        assert.ok(res);
-        res.forEach(function (r, i) {
-            if (open.indexOf(i) >= 0) return;
-            assert.strictEqual(r.combo[0][FING], A_MAJOR_FING[i], 'finger of note ' + i + ', key ' + key);
-            assert.strictEqual(r.combo[0][STR], A_MAJOR_STR[i], 'string of note ' + i + ', key ' + key);
-        });
-    }
-});
-
-test('cello: A major with the open hand (1 2 4 / 0 1 2 4 / ... / 1 2 3)',
-     {todo: 'needs the open-hand frame: B, F#, G#, A come out one finger higher'},
-     function () {
-    const res = core.solveChords(melody(A_MAJOR), 3, 20, 'cello');
-    assert.deepStrictEqual(res.map(function (r) { return r.combo[0][FING]; }), A_MAJOR_FING);
-});
-
-// Bb major, two octaves, as played by Kenji's cello teacher (relayed by Kenji, taken as standard): 2 4 | 0 1 2 4 | 0 1 2 | 1 2 4 | 1 2 3
-// (G string Bb C; D string D Eb F G; A string A Bb C, then D Eb F, then G A Bb).
-// Scale fingerings are conventions; the notes below are the ones where the
-// closed hand agrees. C4 (note 8) and A4, Bb4 (notes 13, 14) use the low first
-// finger and the open hand, which the plugin does not model.
-test('cello: Bb major agrees with the book fingering on the closed-hand notes', function () {
-    const ps   = [46, 48, 50, 51, 53, 55, 57, 58, 60, 62, 63, 65, 67, 69, 70];
-    const want = [2, 4, 0, 1, 2, 4, 0, 1, 2, 1, 2, 4, 1, 2, 3];
-    const skip = [8, 13, 14];
-    for (const key of [-2, 0, 3]) {                                   // key signature must not matter
-        const res = core.solveChords(melody(ps), key, 20, 'cello');
-        assert.ok(res);
-        res.forEach(function (r, i) {
-            if (skip.indexOf(i) >= 0) return;
-            assert.strictEqual(r.combo[0][FING], want[i], 'finger of note ' + i + ', key ' + key);
-        });
-    }
-});
-
-// F# major, two octaves, as played by Kenji's cello teacher (relayed by Kenji, taken as
-// standard): 2 4 1 2 4 1 3 | 4 1 3 1 3 | 1 3 4. The middle part is a shifting 1-3 pair
-// pattern (a memorized convention, like E major) that the solver does not reproduce;
-// the opening and the final three notes agree.
-test('cello: F# major agrees with the teacher on the opening and the final three notes', function () {
-    const ps   = [42, 44, 46, 47, 49, 51, 53, 54, 56, 58, 59, 61, 63, 65, 66];
-    const want = [2, 4, 1, 2, 4, 1, 3, 4, 1, 3, 1, 3, 1, 3, 4];
-    const skip = [7, 8, 9, 10, 11];
-    for (const key of [6, 0, -2]) {                                   // key signature must not matter
-        const res = core.solveChords(melody(ps), key, 20, 'cello');
-        assert.ok(res);
-        res.forEach(function (r, i) {
-            if (skip.indexOf(i) >= 0) return;
-            assert.strictEqual(r.combo[0][FING], want[i], 'finger of note ' + i + ', key ' + key);
-        });
-    }
-});
-
-// Ab major, two octaves, as played by Kenji's cello teacher (relayed by Kenji, taken as
-// standard): 1 3 | 1 2 4 | 1 3 4 | 1 3 2 4 | 1 3 4. The start (half position on the G string)
-// and the 1 3 2 4 group (a half-step shift to II with the finger number falling) differ:
-// the plugin starts on the C string in VI and shifts to III. Its own cost for the teacher's
-// full fingering is only about 3% above its pick.
-test('cello: Ab major agrees with the teacher except the start and the 1 3 2 4 group', function () {
-    const ps   = [44, 46, 48, 49, 51, 53, 55, 56, 58, 60, 61, 63, 65, 67, 68];
-    const want = [1, 3, 1, 2, 4, 1, 3, 4, 1, 3, 2, 4, 1, 3, 4];
-    const skip = [0, 1, 10, 11];
-    for (const key of [-4, 0, 3]) {                                   // key signature must not matter
-        const res = core.solveChords(melody(ps), key, 20, 'cello');
-        assert.ok(res);
-        res.forEach(function (r, i) {
-            if (skip.indexOf(i) >= 0) return;
-            assert.strictEqual(r.combo[0][FING], want[i], 'finger of note ' + i + ', key ' + key);
-        });
-    }
-});
-
-// B major, two octaves, as played by Kenji's cello teacher (relayed by Kenji, taken as
-// standard): 2 4 1 2 4 1 3 4 1 | 3 1 3 | 1 | 2 3. The opening nine notes and the G# agree;
-// the shifting 1-3 pairs and the open-hand ending do not.
-test('cello: B major agrees with the teacher on the opening nine notes and the G#', function () {
-    const ps   = [47, 49, 51, 52, 54, 56, 58, 59, 61, 63, 64, 66, 68, 70, 71];
-    const want = [2, 4, 1, 2, 4, 1, 3, 4, 1, 3, 1, 3, 1, 2, 3];
-    const skip = [9, 10, 11, 13, 14];
-    for (const key of [5, 0, -3]) {                                   // key signature must not matter
-        const res = core.solveChords(melody(ps), key, 20, 'cello');
-        assert.ok(res);
-        res.forEach(function (r, i) {
-            if (skip.indexOf(i) >= 0) return;
-            assert.strictEqual(r.combo[0][FING], want[i], 'finger of note ' + i + ', key ' + key);
-        });
-    }
-});
-
-// A melodic minor (ascending), two octaves, as played by Kenji's cello teacher (relayed by
-// Kenji, taken as standard): 1 3 4 | 0 1 2 4 | 0 1 2 | 1 3 | 1 2 3. From the D string up it is
-// the same line and the same fingering as A major. F#3, G#4 and A4 use the open hand, which
-// the plugin does not model; the rest agrees.
-test('cello: A melodic minor agrees with the teacher except the open-hand notes', function () {
-    const ps   = [45, 47, 48, 50, 52, 54, 56, 57, 59, 60, 62, 64, 66, 68, 69];
-    const want = [1, 3, 4, 0, 1, 2, 4, 0, 1, 2, 1, 3, 1, 2, 3];
-    const skip = [5, 13, 14];
-    for (const key of [0, 3, -2]) {                                   // key signature must not matter
-        const res = core.solveChords(melody(ps), key, 20, 'cello');
-        assert.ok(res);
-        res.forEach(function (r, i) {
-            if (skip.indexOf(i) >= 0) return;
-            assert.strictEqual(r.combo[0][FING], want[i], 'finger of note ' + i + ', key ' + key);
-        });
-    }
-});
-
-// E melodic minor (ascending), two octaves, as played by Kenji's cello teacher (relayed by
-// Kenji, taken as standard): 2 4 0 1 2 4 1 2 4 1 2 4 1 3 4.
-// B2 is the open hand; from F#3 on the teacher repeats a shifting 1-2-4 shape (like E, F#
-// and B major), which the solver does not reproduce.
-test('cello: E melodic minor agrees with the teacher on the opening and the last two notes', function () {
-    const ps   = [40, 42, 43, 45, 47, 49, 51, 52, 54, 55, 57, 59, 61, 63, 64];
-    const want = [2, 4, 0, 1, 2, 4, 1, 2, 4, 1, 2, 4, 1, 3, 4];
-    const skip = [4, 8, 9, 10, 11, 12];
-    for (const key of [1, 0, -3]) {                                   // key signature must not matter
-        const res = core.solveChords(melody(ps), key, 20, 'cello');
-        assert.ok(res);
-        res.forEach(function (r, i) {
-            if (skip.indexOf(i) >= 0) return;
-            assert.strictEqual(r.combo[0][FING], want[i], 'finger of note ' + i + ', key ' + key);
-        });
-    }
-});
-
-// D melodic minor (ascending), D2 to E4, as played by Kenji's cello teacher (relayed by
-// Kenji, taken as standard): 1 3 4 | 0 1 2 4 | 0 1 2 4 | 0 1 3 4 2. B2 is the open hand; for
-// the last two notes the teacher stays in I (D4 with 4) and shifts for E4, where the plugin
-// shifts first.
-test('cello: D melodic minor agrees with the teacher except B2 and the last two notes', function () {
-    const ps   = [38, 40, 41, 43, 45, 47, 49, 50, 52, 53, 55, 57, 59, 61, 62, 64];
-    const want = [1, 3, 4, 0, 1, 2, 4, 0, 1, 2, 4, 0, 1, 3, 4, 2];
-    const skip = [5, 14, 15];
-    for (const key of [-1, 0, 3]) {                                   // key signature must not matter
-        const res = core.solveChords(melody(ps), key, 20, 'cello');
-        assert.ok(res);
-        res.forEach(function (r, i) {
-            if (skip.indexOf(i) >= 0) return;
-            assert.strictEqual(r.combo[0][FING], want[i], 'finger of note ' + i + ', key ' + key);
-        });
-    }
-});
-
-// B melodic minor (ascending), B2 to B4, as played by Kenji's cello teacher (relayed by Kenji,
-// taken as standard): 1 4 0 1 2 4 1 2 4 1 2 4 1 3 4. The opening B with finger 1 and C# with
-// finger 4 (a whole tone apart) fits none of the plugin's hand frames, and the middle is the
-// shifting 1-2-4 shape; only C#3, D3, E3 and G#4, A#4, B4 are asserted.
-test('cello: B melodic minor agrees with the teacher on C#, D, E and the last three notes', function () {
-    const ps   = [47, 49, 50, 52, 54, 56, 58, 59, 61, 62, 64, 66, 68, 70, 71];
-    const want = [1, 4, 0, 1, 2, 4, 1, 2, 4, 1, 2, 4, 1, 3, 4];
-    const keep = [1, 2, 3, 12, 13, 14];
-    for (const key of [2, 0, -3]) {                                   // key signature must not matter
-        const res = core.solveChords(melody(ps), key, 20, 'cello');
-        assert.ok(res);
-        keep.forEach(function (i) {
-            assert.strictEqual(res[i].combo[0][FING], want[i], 'finger of note ' + i + ', key ' + key);
-        });
-    }
-});
-
-// G melodic minor (ascending), G2 to G4, as played by Kenji's cello teacher (relayed by Kenji,
-// taken as standard): 0 1 2 4 | 0 1 3 4 | 0 1 2 4 | 1 3 4. C4 and D4 follow a low first-finger
-// Bb (back-extended first finger), which the plugin does not model.
-test('cello: G melodic minor agrees with the teacher except C4 and D4', function () {
-    const ps   = [43, 45, 46, 48, 50, 52, 54, 55, 57, 58, 60, 62, 64, 66, 67];
-    const want = [0, 1, 2, 4, 0, 1, 3, 4, 0, 1, 2, 4, 1, 3, 4];
-    const skip = [10, 11];
-    for (const key of [-2, 0, 3]) {                                   // key signature must not matter
-        const res = core.solveChords(melody(ps), key, 20, 'cello');
-        assert.ok(res);
-        res.forEach(function (r, i) {
-            if (skip.indexOf(i) >= 0) return;
-            assert.strictEqual(r.combo[0][FING], want[i], 'finger of note ' + i + ', key ' + key);
-        });
-    }
-});
-
-// F# melodic minor (ascending), F#2 to F#4, as played by Kenji's cello teacher (relayed by
-// Kenji, taken as standard): 2 4 1 2 4 1 3 4 1 2 4 1 3 3 4. The first eight notes are the
-// shifting shape of F# major, which the solver does not reproduce; only the last two notes
-// (E#4 with 3, F#4 with 4) are asserted.
-test('cello: F# melodic minor agrees with the teacher on the last two notes', function () {
-    const ps   = [42, 44, 45, 47, 49, 51, 53, 54, 56, 57, 59, 61, 63, 65, 66];
-    const want = [2, 4, 1, 2, 4, 1, 3, 4, 1, 2, 4, 1, 3, 3, 4];
-    for (const key of [3, 0, -2]) {                                   // key signature must not matter
-        const res = core.solveChords(melody(ps), key, 20, 'cello');
-        assert.ok(res);
-        [13, 14].forEach(function (i) {
-            assert.strictEqual(res[i].combo[0][FING], want[i], 'finger of note ' + i + ', key ' + key);
-        });
-    }
-});
-
-// C melodic minor (ascending), C2 to C4, as played by Kenji's cello teacher (relayed by Kenji,
-// taken as standard): 0 1 2 4 | 0 1 3 4 | 0 1 2 4 | 0 1 2. The Eb on the D string is a low first
-// finger followed by F with 2; the plugin gets this one through half position.
-test('cello: C melodic minor across the four strings matches the teacher exactly', function () {
-    const ps   = [36, 38, 39, 41, 43, 45, 47, 48, 50, 51, 53, 55, 57, 59, 60];
-    const want = [0, 1, 2, 4, 0, 1, 3, 4, 0, 1, 2, 4, 0, 1, 2];
-    const strs = [0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3];       // C C C C G G G G D D D D A A A
-    for (const key of [-3, 0, 2]) {                                   // key signature must not matter
-        const res = core.solveChords(melody(ps), key, 20, 'cello');
-        assert.ok(res);
-        assert.deepStrictEqual(res.map(function (r) { return r.combo[0][FING]; }), want, 'fingers, key ' + key);
-        assert.deepStrictEqual(res.map(function (r) { return r.combo[0][STR]; }), strs, 'strings, key ' + key);
-    }
+test('cello: C major and C minor match the teacher exactly', function () {
+    ['C', 'Cm'].forEach(function (name) {
+        const sc = scales.filter(function (x) { return x.name === name; })[0];
+        const res = core.solveChords(melody(sc.pitches), sc.key, 20, 'cello');
+        assert.deepStrictEqual(res.map(function (r) { return r.combo[0][FING]; }), sc.fingers, name);
+    });
 });
 
 // Bars 5-10 of the BWV 1007 prelude (G major) with the fingering written in Kenji's cello

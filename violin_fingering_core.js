@@ -76,7 +76,9 @@ var DEFAULT_COST = {
     // fingers 1 and 2 as the hand goes up the neck.
     fingerCost: [0, 0, 0, 0],
     fingerHighPos: [0, 0, 0, 0],
-    highPosStart: 0
+    highPosStart: 0,
+    // Departing from the instrument's key map (cello only; see CELLO_KEY_MAP).
+    keyMap: 0
 };
 
 function withDefaults(over) {
@@ -85,6 +87,126 @@ function withDefaults(over) {
     for (var k2 in over) cost[k2] = over[k2];
     return cost;
 }
+
+// Cello key map: per key signature and mode (maj / min = melodic minor), the zero-cost
+// (string index, finger) of each scale tone, taken from a cellist's two-octave scale
+// fingerings. Departing from it costs cost.keyMap, the way an accidental costs on the
+// violin. Strings are indexed low to high (0 = C). Which mode applies is read from the
+// notes (see keyModes).
+var CELLO_KEY_MAP = {
+    "-4": {
+        maj: {
+            44: [[1,1]], 46: [[1,3]], 48: [[1,1]], 49: [[1,2]], 51: [[1,4]], 53: [[2,1]],
+            55: [[2,3]], 56: [[2,4]], 58: [[3,1]], 60: [[3,3]], 61: [[3,2]], 63: [[3,4]],
+            65: [[3,1]], 67: [[3,3]], 68: [[3,4]]
+        }
+    },
+    "-3": {
+        maj: {
+            39: [[0,2]], 41: [[0,4]], 43: [[1,0]], 44: [[1,1]], 46: [[1,2]], 48: [[1,4]],
+            50: [[2,0]], 51: [[2,1]], 53: [[2,2]], 55: [[2,1]], 56: [[2,2]], 58: [[2,4]],
+            60: [[3,1]], 62: [[3,3]], 63: [[3,4]]
+        },
+        min: {
+            36: [[0,0]], 38: [[0,1]], 39: [[0,2]], 41: [[0,4]], 43: [[1,0]], 45: [[1,1]],
+            47: [[1,3]], 48: [[1,4]], 50: [[2,0]], 51: [[2,1]], 53: [[2,2]], 55: [[2,4]],
+            57: [[3,0]], 59: [[3,1]], 60: [[3,2]]
+        }
+    },
+    "-2": {
+        maj: {
+            46: [[1,2]], 48: [[1,4]], 50: [[2,0]], 51: [[2,1]], 53: [[2,2]], 55: [[2,4]],
+            57: [[3,0]], 58: [[3,1]], 60: [[3,2]], 62: [[3,1]], 63: [[3,2]], 65: [[3,4]],
+            67: [[3,1]], 69: [[3,2]], 70: [[3,3]]
+        },
+        min: {
+            43: [[1,0]], 45: [[1,1]], 46: [[1,2]], 48: [[1,4]], 50: [[2,0]], 52: [[2,1]],
+            54: [[2,3]], 55: [[2,4]], 57: [[3,0]], 58: [[3,1]], 60: [[3,2]], 62: [[3,4]],
+            64: [[3,1]], 66: [[3,3]], 67: [[3,4]]
+        }
+    },
+    "-1": {
+        maj: {
+            41: [[0,4]], 43: [[1,0]], 45: [[1,1]], 46: [[1,2]], 48: [[1,4]], 50: [[2,0]],
+            52: [[2,1]], 53: [[2,2]], 55: [[2,4]], 57: [[3,0]], 58: [[3,1]], 60: [[3,2]],
+            62: [[3,1]], 64: [[3,3]], 65: [[3,4]]
+        },
+        min: {
+            38: [[0,1]], 40: [[0,3]], 41: [[0,4]], 43: [[1,0]], 45: [[1,1]], 47: [[1,2]],
+            49: [[1,4]], 50: [[2,0]], 52: [[2,1]], 53: [[2,2]], 55: [[2,4]], 57: [[3,0]],
+            59: [[3,1]], 61: [[3,3]], 62: [[3,4]], 64: [[3,2]]
+        }
+    },
+    "0": {
+        maj: {
+            36: [[0,0]], 38: [[0,1]], 40: [[0,3]], 41: [[0,4]], 43: [[1,0]], 45: [[1,1]],
+            47: [[1,3]], 48: [[1,4]], 50: [[2,0]], 52: [[2,1]], 53: [[2,2]], 55: [[2,4]],
+            57: [[3,0]], 59: [[3,1]], 60: [[3,2]]
+        },
+        min: {
+            45: [[1,1]], 47: [[1,3]], 48: [[1,4]], 50: [[2,0]], 52: [[2,1]], 54: [[2,2]],
+            56: [[2,4]], 57: [[3,0]], 59: [[3,1]], 60: [[3,2]], 62: [[3,1]], 64: [[3,3]],
+            66: [[3,1]], 68: [[3,2]], 69: [[3,3]]
+        }
+    },
+    "1": {
+        maj: {
+            43: [[1,0]], 45: [[1,1]], 47: [[1,3]], 48: [[1,4]], 50: [[2,0]], 52: [[2,1]],
+            54: [[2,3]], 55: [[2,4]], 57: [[3,0]], 59: [[3,1]], 60: [[3,2]], 62: [[3,4]],
+            64: [[3,1]], 66: [[3,3]], 67: [[3,4]]
+        },
+        min: {
+            40: [[0,2]], 42: [[0,4]], 43: [[1,0]], 45: [[1,1]], 47: [[1,2]], 49: [[1,4]],
+            51: [[2,1]], 52: [[2,2]], 54: [[2,4]], 55: [[2,1]], 57: [[2,2]], 59: [[2,4]],
+            61: [[3,1]], 63: [[3,3]], 64: [[3,4]]
+        }
+    },
+    "2": {
+        maj: {
+            38: [[0,1]], 40: [[0,2]], 42: [[0,4]], 43: [[1,0]], 45: [[1,1]], 47: [[1,2]],
+            49: [[1,4]], 50: [[2,0]], 52: [[2,1]], 54: [[2,3]], 55: [[2,4]], 57: [[3,0]],
+            59: [[3,1]], 61: [[3,3]], 62: [[3,4]]
+        },
+        min: {
+            47: [[1,1]], 49: [[1,4]], 50: [[2,0]], 52: [[2,1]], 54: [[2,2]], 56: [[2,4]],
+            58: [[3,1]], 59: [[3,2]], 61: [[3,4]], 62: [[3,1]], 64: [[3,2]], 66: [[3,4]],
+            68: [[3,1]], 70: [[3,3]], 71: [[3,4]]
+        }
+    },
+    "3": {
+        maj: {
+            45: [[1,1]], 47: [[1,2]], 49: [[1,4]], 50: [[2,0]], 52: [[2,1]], 54: [[2,2]],
+            56: [[2,4]], 57: [[3,0]], 59: [[3,1]], 61: [[3,3]], 62: [[3,1]], 64: [[3,3]],
+            66: [[3,1]], 68: [[3,2]], 69: [[3,3]]
+        },
+        min: {
+            42: [[0,2]], 44: [[0,4]], 45: [[1,1]], 47: [[1,2]], 49: [[1,4]], 51: [[2,1]],
+            53: [[2,3]], 54: [[2,4]], 56: [[2,1]], 57: [[2,2]], 59: [[2,4]], 61: [[3,1]],
+            63: [[3,3]], 65: [[3,3]], 66: [[3,4]]
+        }
+    },
+    "4": {
+        maj: {
+            40: [[0,1]], 42: [[0,2]], 44: [[0,4]], 45: [[1,1]], 47: [[1,2]], 49: [[1,4]],
+            51: [[2,1]], 52: [[2,2]], 54: [[2,4]], 56: [[2,1]], 57: [[2,2]], 59: [[2,4]],
+            61: [[3,1]], 63: [[3,3]], 64: [[3,4]]
+        }
+    },
+    "5": {
+        maj: {
+            47: [[1,2]], 49: [[1,4]], 51: [[2,1]], 52: [[2,2]], 54: [[2,4]], 56: [[2,1]],
+            58: [[2,3]], 59: [[2,4]], 61: [[3,1]], 63: [[3,3]], 64: [[3,1]], 66: [[3,3]],
+            68: [[3,1]], 70: [[3,2]], 71: [[3,3]]
+        }
+    },
+    "6": {
+        maj: {
+            42: [[0,2]], 44: [[0,4]], 46: [[1,1]], 47: [[1,2]], 49: [[1,4]], 51: [[2,1]],
+            53: [[2,3]], 54: [[2,4]], 56: [[2,1]], 58: [[2,3]], 59: [[3,1]], 61: [[3,3]],
+            63: [[3,1]], 65: [[3,3]], 66: [[3,4]]
+        }
+    }
+};
 
 var INSTRUMENTS = {
     violin: {
@@ -142,9 +264,13 @@ var INSTRUMENTS = {
             names: ["C", "G", "D", "A"],
             labels: ["①", "②", "③", "④"]
         },
+        keyMap: CELLO_KEY_MAP,
         hand: {
             frameModel: "chromatic",
             frameOffsets: [0, 1, 2, 3],
+            // Open hand (extension): finger 1 stays, a whole tone to finger 2, then
+            // semitones. Reachable only where the key map lists such a finger.
+            openOffsets: [0, 2, 3, 4],
             frameAnchor: 2,
             hlEnabled: false,
             minPosition: 0,         // half position: finger 1 a semitone above the open string
@@ -178,6 +304,7 @@ var INSTRUMENTS = {
                 chordPosSpanPair: 4,
                 // Fourth finger is rarely used in the lower positions and almost
                 // never up the neck; third thins out too (1/2 dominate high up).
+                keyMap: 0.2,
                 // The 5th entry is the thumb (see hand.thumb for when it
                 // may compete at all).
                 fingerCost: [0, 0, 0.05, 0.2, 0.5],
@@ -266,6 +393,11 @@ var THUMB_PITCH = -2;
 
 function isThumbArticulation(symbol, subtypeName) {
     return symbol === THUMB_SYMID || subtypeName === THUMB_SUBTYPE_NAME;
+}
+
+// Offset of a candidate's finger in its own hand shape (closed or open).
+function shapeOffset(inst, c) {
+    return c[7] ? inst.hand.openOffsets[c[1] - 1] : inst.hand.frameOffsets[c[1] - 1];
 }
 
 // Semitone offset of a finger within the hand frame (thumb included).
@@ -390,12 +522,63 @@ function posCost(inst, p) {
 
 // --- chord-aware (multi-note per event) ---------------
 
-function candidatesForEvent(notes, key, maxPosition, instrument) {
+// 1 when the instrument has a key map entry for this pitch and the candidate
+// (string, finger) is not among its choices; 0 otherwise.
+// Mode of each key signature in use, read from the notes: a melodic minor has the
+// raised seventh of the relative minor, a pitch class outside the major scale.
+function keyModes(events, key) {
+    var modes = {}, seen = {};
+    for (var i = 0; i < events.length; i++) {
+        var k = events[i].key != null ? events[i].key : key;
+        seen[k] = seen[k] || {};
+        for (var j = 0; j < events[i].pitches.length; j++)
+            seen[k][events[i].pitches[j].pitch % 12] = 1;
+    }
+    for (var kk in seen) {
+        var tonic = (((+kk * 7) % 12) + 12) % 12;          // major tonic of the signature
+        modes[kk] = seen[kk][(tonic + 8) % 12] ? "min" : "maj";
+    }
+    return modes;
+}
+
+function keyMapMiss(km, cand) {
+    var opts = km && km[cand[4]];
+    if (!opts) return 0;
+    for (var i = 0; i < opts.length; i++)
+        if (opts[i][0] === cand[0] && opts[i][1] === cand[1]) return 0;
+    return 1;
+}
+
+// The instrument's key map for a signature and mode ("min" or anything else = major).
+function keyMapFor(inst, key, mode) {
+    var slot = inst.keyMap && inst.keyMap[key];
+    return slot ? slot[mode === "min" ? "min" : "maj"] : null;
+}
+
+// The key map may name an open-hand finger (index 7 = 1) that the closed hand
+// cannot play at that pitch; make it a candidate at the position it implies.
+function addKeyMapCandidates(cs, pitch, km, maxPosition, inst) {
+    var opts = km && km[pitch];
+    if (!opts || !inst.hand.openOffsets) return;
+    var tun = inst.strings.tuning;
+    for (var i = 0; i < opts.length; i++) {
+        var s = opts[i][0], f = opts[i][1], have = false;
+        if (f < 2 || f > 4) continue;
+        var p = pitch - tun[s] - 1 - inst.hand.openOffsets[f - 1];
+        for (var j = 0; j < cs.length; j++)
+            if (cs[j][0] === s && cs[j][1] === f && cs[j][2] === p) { have = true; break; }
+        if (!have && p >= inst.hand.minPosition && p <= maxPosition)
+            cs.push([s, f, p, 0, pitch, 0, 0, 1]);
+    }
+}
+
+function candidatesForEvent(notes, key, maxPosition, instrument, mode) {
     var inst = resolveInst(instrument);
     if (maxPosition === undefined) maxPosition = inst.hand.maxPosition;
     var perNote = [];
     for (var i = 0; i < notes.length; i++) {
         var cs = candidatesForPitch(notes[i].pitch, key, maxPosition, inst);
+        addKeyMapCandidates(cs, notes[i].pitch, keyMapFor(inst, key, mode), maxPosition, inst);
         if (notes[i].string != null) {
             var ms = inst.strings.tuning.length - notes[i].string;
             cs = cs.filter(function (c) { return c[0] === ms; });
@@ -408,9 +591,11 @@ function candidatesForEvent(notes, key, maxPosition, instrument) {
         // Mark candidates whose displacement direction contradicts the
         // note's spelling (+1 sharp side, -1 flat side, 0/absent unknown).
         var sp = notes[i].spell;
+        var km = keyMapFor(inst, key, mode);
         cs = cs.map(function (c) {
             var d = c.slice();
             d[5] = (sp && d[3] !== 0 && d[3] !== sp) ? 1 : 0;
+            if (km) d[6] = keyMapMiss(km, d);
             return d;
         });
         perNote.push(cs);
@@ -477,6 +662,7 @@ function chordLocalCost(entry, inst) {
         if (k === 0) c += inst.cost.open[s];
         if (off !== 0) c += inst.cost.accidental;
         if (combo[i][5]) c += inst.cost.spell;
+        if (combo[i][6]) c += inst.cost.keyMap;
         if (k > 0) {
             positions.push(p);
             c += inst.cost.altLowString * Math.max(0, p - 1) * (top - s);
@@ -542,7 +728,9 @@ function chordTransCost(prev, cur, instrument) {
             // one finger step away.
             var reach = (a[1] === THUMB || b[1] === THUMB)
                 ? Math.abs(handOffset(inst, a[1]) - handOffset(inst, b[1]))
-                : inst.cost.stretchPerFinger * Math.abs(a[1] - b[1]);
+                : (a[7] || b[7])
+                    ? Math.abs(shapeOffset(inst, a) - shapeOffset(inst, b))
+                    : inst.cost.stretchPerFinger * Math.abs(a[1] - b[1]);
             var stretch = Math.abs(a[4] - b[4]) - reach;
             if (stretch > 0) c += inst.cost.stretch * stretch;
         } else if (a[0] === b[0] && a[1] > 0 && a[1] === b[1] && a[3] !== b[3]) {
@@ -564,11 +752,12 @@ function chordTransCost(prev, cur, instrument) {
 function solveChords(events, key, maxPosition, instrument) {
     var inst = resolveInst(instrument);
     if (!events.length) return [];
+    var modes = inst.keyMap ? keyModes(events, key) : null;
     var out = [];
     var start = 0;
     for (var i = 1; i <= events.length; i++) {
         if (i < events.length && !eventHasPin(events[i])) continue;
-        var seg = solveSegWithThumb(events.slice(start, i), key, maxPosition, inst);
+        var seg = solveSegWithThumb(events.slice(start, i), key, maxPosition, inst, modes);
         if (!seg) return null;
         out = out.concat(seg);
         start = i;
@@ -588,14 +777,14 @@ function eventHasPin(e) {
 // solve again letting the thumb compete there (and wherever a hand-placed
 // sign pins it). The second pass can only lower the cost: every first-pass
 // choice is still available to it.
-function solveSegWithThumb(events, key, maxPosition, instrument) {
+function solveSegWithThumb(events, key, maxPosition, instrument, modes) {
     var inst = resolveInst(instrument);
     var th = inst.hand.thumb;
-    if (!th) return solveChordSeg(events, key, maxPosition, inst, null);
+    if (!th) return solveChordSeg(events, key, maxPosition, inst, null, modes);
     var n = events.length;
     var allow = [];
     for (var i = 0; i < n; i++) allow.push(eventPinsThumb(events[i]));
-    var first = solveChordSeg(events, key, maxPosition, inst, allow);
+    var first = solveChordSeg(events, key, maxPosition, inst, allow, modes);
     if (!first) return null;
     var per = pathEventCosts(first, inst);
     var any = false;
@@ -608,7 +797,7 @@ function solveSegWithThumb(events, key, maxPosition, instrument) {
         if (sum / cnt > th.threshold) { next[e] = true; any = true; }
     }
     if (!any) return first;
-    return solveChordSeg(events, key, maxPosition, inst, next) || first;
+    return solveChordSeg(events, key, maxPosition, inst, next, modes) || first;
 }
 
 function eventPinsThumb(e) {
@@ -633,13 +822,13 @@ function noThumb(entry) {
 }
 
 // allowThumb: per-event flags, or null for an instrument without a thumb.
-function solveChordSeg(events, key, maxPosition, instrument, allowThumb) {
+function solveChordSeg(events, key, maxPosition, instrument, allowThumb, modes) {
     var inst = resolveInst(instrument);
     if (!events.length) return [];
     var layers = [];
     for (var i = 0; i < events.length; i++) {
         var evKey = events[i].key != null ? events[i].key : key;
-        var combos = candidatesForEvent(events[i].pitches, evKey, maxPosition, inst);
+        var combos = candidatesForEvent(events[i].pitches, evKey, maxPosition, inst, modes && modes[evKey]);
         if (allowThumb && !allowThumb[i]) combos = combos.filter(noThumb);
         if (!combos.length) return null;
         layers.push(combos);

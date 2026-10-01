@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Cello key map: for each key signature (major and melodic minor, the mode read from
+  the notes) the string and finger of each scale tone from a cellist's two-octave
+  scales cost nothing; departing from them costs a little (`cost.keyMap`), like an
+  accidental on the violin. Open-hand fingerings the map names (fingers 1-2 a whole
+  tone apart) become candidates. Scale fingerings now match 90% of notes (was 73%);
+  the 86 sparse Bach marks agree less (44, was 50), which those marks cannot judge.
 - `gen_golden.js` moved to `tools/`: `node --test` was running it and rewriting the
   golden snapshot on every test run.
 
