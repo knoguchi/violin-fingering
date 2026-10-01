@@ -121,7 +121,7 @@ INSTRUMENTS.cello = makeInstrument({
     name: "cello",
     tuning: [36, 43, 50, 57],                  // C2 G2 D3 A3
     stringNames: ["C", "G", "D", "A"],
-    stringLabels: ["\u2460", "\u2461", "\u2462", "\u2463"],
+    stringLabels: ["①", "②", "③", "④"],
     frameModel: "chromatic",
     frameOffsets: [0, 1, 2, 3],
     frameAnchor: 2,
