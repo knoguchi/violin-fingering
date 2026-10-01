@@ -615,3 +615,30 @@ test('cello: Eb major F3 on the D string is finger 2 after a low first-finger Eb
     const res = core.solveChords(melody(EB_MAJOR), -3, 20, 'cello');
     assert.deepStrictEqual(res.map(function (r) { return r.combo[0][FING]; }), EB_MAJOR_FING);
 });
+
+// A major, two octaves, as supplied by Kenji:
+//   G string A B C# = 1 2 4 | D string D E F# G# = 0 1 2 4 | A string A B C# = 0 1 3 |
+//   D E = 1 3 (shifted) | F# G# A = 1 2 3 (shifted, open hand)
+const A_MAJOR = [45, 47, 49, 50, 52, 54, 56, 57, 59, 61, 62, 64, 66, 68, 69];
+const A_MAJOR_FING = [1, 2, 4, 0, 1, 2, 4, 0, 1, 3, 1, 3, 1, 2, 3];
+const A_MAJOR_STR  = [1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3];
+
+test('cello: A major agrees with the book fingering on the closed-hand notes', function () {
+    const open = [1, 5, 13, 14];                                      // B, F#, G#, A: open hand, see the todo
+    for (const key of [3, 0, -2]) {                                   // key signature must not matter
+        const res = core.solveChords(melody(A_MAJOR), key, 20, 'cello');
+        assert.ok(res);
+        res.forEach(function (r, i) {
+            if (open.indexOf(i) >= 0) return;
+            assert.strictEqual(r.combo[0][FING], A_MAJOR_FING[i], 'finger of note ' + i + ', key ' + key);
+            assert.strictEqual(r.combo[0][STR], A_MAJOR_STR[i], 'string of note ' + i + ', key ' + key);
+        });
+    }
+});
+
+test('cello: A major with the open hand (1 2 4 / 0 1 2 4 / ... / 1 2 3)',
+     {todo: 'needs the open-hand frame: B, F#, G#, A come out one finger higher'},
+     function () {
+    const res = core.solveChords(melody(A_MAJOR), 3, 20, 'cello');
+    assert.deepStrictEqual(res.map(function (r) { return r.combo[0][FING]; }), A_MAJOR_FING);
+});
