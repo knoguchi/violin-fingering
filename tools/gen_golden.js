@@ -1,9 +1,11 @@
 // Regenerates test/golden.json: solveChords snapshots for violin/viola.
-// Run only to deliberately re-baseline; golden.test.js guards refactors.
+// Run by hand (node tools/gen_golden.js) only to deliberately re-baseline;
+// golden.test.js guards refactors. Kept out of test/ because `node --test`
+// runs every .js file under test/, which rewrote the snapshot on every run.
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const core = require('./load_core.js');
+const core = require('../test/load_core.js');
 
 let seed = 12345;
 function rnd(n) { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed % n; }
@@ -36,5 +38,5 @@ for (const inst of ['violin', 'viola']) {
 }
 for (const c of CASES)
     c.result = core.solveChords(c.events, c.key, 7, c.inst);
-fs.writeFileSync(path.join(__dirname, 'golden.json'), JSON.stringify(CASES));
+fs.writeFileSync(path.join(__dirname, '..', 'test', 'golden.json'), JSON.stringify(CASES));
 console.log(CASES.length, 'cases,', CASES.filter(c => c.result === null).length, 'unsolvable');

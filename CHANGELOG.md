@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Cello key map: per key signature, the (string, finger) of each scale tone from
+  a cellist's two-octave major and melodic minor scales costs nothing; departing
+  from it costs a little (`cost.keyMap`), like an accidental on the violin. Scale
+  fingerings now match 82% of notes (was 73%).
+- `gen_golden.js` moved to `tools/`: `node --test` was running it and rewriting the
+  golden snapshot on every test run.
+
 ## 1.6.0-rc1 (2026-10-01)
 
 - The plugin sits at the top level of the Plugins menu (no category), so it
