@@ -149,10 +149,14 @@ var INSTRUMENTS = {
             hlEnabled: false,
             minPosition: 0,         // half position: finger 1 a semitone above the open string
             maxPosition: 20,
-            // Thumb (finger 5, the thumb-position sign): a fifth hand slot lying across the
-            // strings, offset semitones from finger 1 of the same position,
-            // usable from minPosition up. Placeholder values, to be tuned.
-            thumb: {offset: -2, minPosition: 12}
+            // Thumb (finger 5, the thumb-position sign): a fifth hand slot
+            // lying across the strings, offset semitones from finger 1 of the
+            // same position, usable from minPosition up. A special case, not a
+            // regular finger: the solver first fingers without it, and only
+            // where the cost, averaged over +/- `window` events, exceeds
+            // `threshold` may the thumb compete (a hand-placed sign always
+            // counts). Placeholder values, to be tuned.
+            thumb: {offset: -2, minPosition: 12, window: 6, threshold: 2.5}
         },
         cost: withDefaults({
                 // One position step is a semitone: shifts are cheaper per step, the
@@ -170,11 +174,9 @@ var INSTRUMENTS = {
                 chordPosSpanPair: 4,
                 // Fourth finger is rarely used in the lower positions and almost
                 // never up the neck; third thins out too (1/2 dominate high up).
-                // The 5th entry is the thumb: a special case, not a regular
-                // finger. High enough that the solver picks it only when
-                // four-finger positions would be far worse; a hand-placed
-                // sign always wins (it pins the note).
-                fingerCost: [0, 0, 0.05, 0.2, 5],
+                // The 5th entry is the thumb (see hand.thumb for when it
+                // may compete at all).
+                fingerCost: [0, 0, 0.05, 0.2, 0.5],
                 fingerHighPos: [0, 0, 0.1, 0.3, 0],
                 highPosStart: 9
         })
@@ -562,7 +564,7 @@ function solveChords(events, key, maxPosition, instrument) {
     var start = 0;
     for (var i = 1; i <= events.length; i++) {
         if (i < events.length && !eventHasPin(events[i])) continue;
-        var seg = solveChordSeg(events.slice(start, i), key, maxPosition, inst);
+        var seg = solveSegWithThumb(events.slice(start, i), key, maxPosition, inst);
         if (!seg) return null;
         out = out.concat(seg);
         start = i;
@@ -576,13 +578,65 @@ function eventHasPin(e) {
     return false;
 }
 
-function solveChordSeg(events, key, maxPosition, instrument) {
+// Fingers a segment. Without a thumb in the instrument's config this is
+// one Viterbi pass. With one: solve without the thumb, then, where the
+// cost averaged over a window around an event exceeds hand.thumb.threshold,
+// solve again letting the thumb compete there (and wherever a hand-placed
+// sign pins it). The second pass can only lower the cost: every first-pass
+// choice is still available to it.
+function solveSegWithThumb(events, key, maxPosition, instrument) {
+    var inst = resolveInst(instrument);
+    var th = inst.hand.thumb;
+    if (!th) return solveChordSeg(events, key, maxPosition, inst, null);
+    var n = events.length;
+    var allow = [];
+    for (var i = 0; i < n; i++) allow.push(eventPinsThumb(events[i]));
+    var first = solveChordSeg(events, key, maxPosition, inst, allow);
+    if (!first) return null;
+    var per = pathEventCosts(first, inst);
+    var any = false;
+    var next = allow.slice();
+    for (var e = 0; e < n; e++) {
+        var sum = 0, cnt = 0;
+        for (var k = Math.max(0, e - th.window); k <= Math.min(n - 1, e + th.window); k++) {
+            sum += per[k]; cnt++;
+        }
+        if (sum / cnt > th.threshold) { next[e] = true; any = true; }
+    }
+    if (!any) return first;
+    return solveChordSeg(events, key, maxPosition, inst, next) || first;
+}
+
+function eventPinsThumb(e) {
+    for (var i = 0; i < e.pitches.length; i++)
+        if (e.pitches[i].finger === THUMB) return true;
+    return false;
+}
+
+// Cost each event adds along a chosen path (its own plus the move into it).
+function pathEventCosts(path, inst) {
+    var out = [];
+    for (var i = 0; i < path.length; i++)
+        out.push(chordLocalCost(path[i], inst)
+                 + (i ? chordTransCost(path[i - 1], path[i], inst) : 0));
+    return out;
+}
+
+function noThumb(entry) {
+    for (var i = 0; i < entry.combo.length; i++)
+        if (entry.combo[i][1] === THUMB) return false;
+    return true;
+}
+
+// allowThumb: per-event flags, or null for an instrument without a thumb.
+function solveChordSeg(events, key, maxPosition, instrument, allowThumb) {
     var inst = resolveInst(instrument);
     if (!events.length) return [];
     var layers = [];
     for (var i = 0; i < events.length; i++) {
         var evKey = events[i].key != null ? events[i].key : key;
         var combos = candidatesForEvent(events[i].pitches, evKey, maxPosition, inst);
+        if (allowThumb && !allowThumb[i]) combos = combos.filter(noThumb);
         if (!combos.length) return null;
         layers.push(combos);
     }

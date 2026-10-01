@@ -464,3 +464,24 @@ test('thumb: articulation recognised by symbol id or subtype name', function () 
     assert.ok(core.isThumbArticulation(-1, 'Thumb position'));
     assert.ok(!core.isThumbArticulation(1234, 'Staccato'));
 });
+
+test('thumb: competes only where the four-finger cost exceeds the threshold', function () {
+    const th = core.INSTRUMENTS.cello.hand.thumb;
+    const saved = th.threshold;
+    const passage = melody([69, 72, 70, 74, 76, 72, 69, 65, 62, 64, 65, 70, 76, 71, 73, 79, 76, 74, 72, 70]);
+    const thumbs = function () {
+        return core.solveChords(passage, 0, 20, 'cello')
+            .filter(function (r) { return r.combo[0][FING] === core.THUMB; }).length;
+    };
+    try {
+        th.threshold = 1e9;
+        assert.strictEqual(thumbs(), 0, 'never flagged: no thumb');
+        th.threshold = -1;
+        assert.ok(thumbs() > 0, 'always flagged: the thumb competes and wins somewhere');
+    } finally { th.threshold = saved; }
+});
+
+test('thumb: an easy low passage never uses it with the default threshold', function () {
+    const res = core.solveChords(melody([36, 38, 40, 41, 43, 45, 47, 48]), 0, 20, 'cello');
+    res.forEach(function (r) { assert.notStrictEqual(r.combo[0][FING], core.THUMB); });
+});

@@ -15,8 +15,10 @@
 - Cello thumb position: the thumb is finger 5. MuseScore stores the
   thumb-position sign as an articulation on the chord, so the plugin writes
   and reads that (one per chord; a hand-placed sign pins the chord's lowest
-  note to the thumb; Clear removes the plugin's own). Thumb offset, entry position and cost
-  are placeholders to tune against real cello fingerings.
+  note to the thumb; Clear removes the plugin's own). The solver fingers without the
+  thumb first and lets it compete only where the local cost (averaged over +/- 6 events) exceeds a
+  threshold; a hand-placed sign always counts. Offset, entry position,
+  threshold and cost are placeholders to tune against real cello fingerings.
 - Annotation recognition (Clear, re-run, manual constraints) is now built
   from the config: position marks up to XX and the half mark, string
   marks up to the largest string count (fixes cello positions above VIII
