@@ -34,17 +34,21 @@ Annotated by the plugin:
 3. Open a violin score and run the plugin from the Plugins menu.
 
 ## Usage
-The **Staff** dropdown picks the part to process (one staff at a time);
-it defaults to the staff of the current selection. A range selection
-narrows the tick window; with none, the whole score is processed. The
-staff's instrument is pre-selected from the part (Violin / Viola radio
-buttons; override them if detection is wrong, and the last choice
-is remembered). Viola uses C-G-D-A tuning with the same hand model a fifth
-lower. Tick **Experimental instruments** to also get Cello (a chromatic,
-semitone-per-finger hand frame) and a 5-string violin (C-G-D-A-E).
-Repeat per part in a multi-part score.
+Select the measures you want fingered (a range on one staff) and run the
+plugin: the selection decides the staff and the range. With no selection,
+the **Staff** dropdown picks the staff and the whole staff is processed.
+One staff at a time: if the selection spans several staves, the first is
+used (the dialog says so); repeat per part in a multi-part score.
 
-- **Run**: computes fingering for the selection (or the whole score) and writes
+The staff's instrument is pre-selected from the part. Open **Instrument**
+in the dialog to override it (Violin / Viola; the last choice is
+remembered). Viola uses C-G-D-A tuning with the same hand model a fifth
+lower. Tick **Experimental instruments** there to also get Cello (a
+chromatic, semitone-per-finger hand frame) and a 5-string violin
+(C-G-D-A-E).
+
+
+- **Run**: computes fingering for the selected measures (or the whole staff) and writes
   finger numbers and position marks as annotations on the staff.
   Re-running (e.g. after a plugin update) replaces the plugin's own previous
   annotations: everything the plugin writes is tracked in a score meta tag

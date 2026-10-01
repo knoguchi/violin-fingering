@@ -32,19 +32,63 @@ MuseScore {
             return;
         }
         staffModel = buildStaffModel();
-        // default the dropdown to the selection's staff, if there is one
-        var c = curScore.newCursor();
-        c.rewind(Cursor.SELECTION_START);
-        var defStaff = c.segment ? c.staffIdx : 0;
-        for (var i = 0; i < staffModel.length; i++)
-            if (staffModel[i].staff === defStaff) { staffSelect.currentIndex = i; break; }
-        instrumentForStaff();
+        lastStaff = -1;
+        refreshTarget();
     }
 
-    // The staff being processed: chosen in the dialog's staff dropdown.
-    // One staff at a time; a selection only narrows the tick range.
+    // The staff being processed. A range selection wins: its first staff and
+    // its tick range. With no selection the staff dropdown picks the staff
+    // and the whole staff is processed. One staff at a time.
     property int targetStaff: 0
     property var staffModel: []
+    // {has, staff, nStaves} describing the current range selection.
+    property var sel: ({has: false, staff: 0, nStaves: 0})
+    property int lastStaff: -1
+    property bool advancedOpen: false
+
+    function readSelection() {
+        var out = {has: false, staff: 0, nStaves: 0};
+        var c = curScore.newCursor();
+        c.rewind(Cursor.SELECTION_START);
+        if (!c.segment) return out;
+        out.has = true;
+        out.staff = c.staffIdx;
+        out.nStaves = 1;
+        try {
+            var n = curScore.selection.endStaff - curScore.selection.startStaff;
+            if (n > 1) out.nStaves = n;
+        } catch (e) {}
+        return out;
+    }
+
+    function staffEntry(staffIdx) {
+        for (var i = 0; i < staffModel.length; i++)
+            if (staffModel[i].staff === staffIdx) return staffModel[i];
+        return null;
+    }
+
+    function effectiveStaff() {
+        if (sel.has) return sel.staff;
+        return staffModel.length
+            ? staffModel[Math.max(0, staffSelect.currentIndex)].staff : 0;
+    }
+
+    // Re-read the selection (it may have changed while the dialog is open)
+    // and pre-select the instrument when the staff under work changed.
+    function refreshTarget() {
+        sel = readSelection();
+        var st = effectiveStaff();
+        if (st !== lastStaff) { lastStaff = st; instrumentForStaff(); }
+    }
+
+    // "Selection: 2: Violin II - 5-string violin", for the line above the options.
+    function targetSummary() {
+        var e = staffEntry(effectiveStaff());
+        var txt = (sel.has ? "Selection: " : "Whole staff: ") + (e ? e.text : "?");
+        if (sel.nStaves > 1)
+            txt += " (first of " + sel.nStaves + " selected staves; one at a time)";
+        return txt + " - " + (activeInst ? activeInst.label : "");
+    }
 
     // Instrument being fingered: the instrument radio buttons. The
     // staff dropdown pre-selects it from the part's instrument id; the
@@ -97,8 +141,7 @@ MuseScore {
 
     // Pre-select the radio from the chosen staff's part.
     function instrumentForStaff() {
-        var entry = staffModel.length
-            ? staffModel[Math.max(0, staffSelect.currentIndex)] : null;
+        var entry = staffEntry(effectiveStaff());
         var det = entry ? detectPartInstrument(entry.partIndex) : "";
         blockedInstrument = "";
         if (det && isAvailable(det)) activeInstrument = det;
@@ -231,10 +274,10 @@ MuseScore {
 
     // -- score scanning ----------------------------------
     function collectEvents() {
-        // Staff comes from the dropdown; a range selection only narrows
-        // the tick window (whatever staff it was made on).
-        var staffIdx = staffModel.length
-            ? staffModel[Math.max(0, staffSelect.currentIndex)].staff : 0;
+        // A range selection decides staff and tick window; otherwise the
+        // dropdown's staff, whole.
+        sel = readSelection();
+        var staffIdx = effectiveStaff();
         var cursor = curScore.newCursor();
         cursor.rewind(Cursor.SELECTION_START);
         var endTick = -1;
@@ -646,9 +689,17 @@ MuseScore {
             // Plain Text defaults to black; follow the themed Controls
             // palette so it stays readable in dark mode.
             color: writeFingers.palette.windowText
-            text: "Computes fingering for the selection (or whole score) and writes finger numbers and position marks as annotations.\nExisting finger/string annotations are honored as constraints."
+            text: "Computes fingering for the selected measures (or the whole staff) and writes finger numbers and position marks as annotations.\nExisting finger/string annotations are honored as constraints."
+        }
+        Text {
+            Layout.fillWidth: true
+            wrapMode: Text.WordWrap
+            font.bold: true
+            color: writeFingers.palette.windowText
+            text: plugin.targetSummary()
         }
         RowLayout {
+            visible: !plugin.sel.has
             Layout.fillWidth: true
             Text {
                 text: "Staff:"
@@ -659,31 +710,40 @@ MuseScore {
                 Layout.fillWidth: true
                 model: staffModel
                 textRole: "text"
-                onActivated: plugin.instrumentForStaff()
+                onActivated: plugin.refreshTarget()
             }
         }
-        RowLayout {
+        Button {
+            flat: true
+            text: (plugin.advancedOpen ? "\u25be" : "\u25b8") + " Instrument"
+            onClicked: plugin.advancedOpen = !plugin.advancedOpen
+        }
+        ColumnLayout {
+            visible: plugin.advancedOpen
             Layout.fillWidth: true
-            Text {
-                text: "Instrument:"
-                color: writeFingers.palette.windowText
-            }
-            ButtonGroup { id: instrumentGroup }
-            Repeater {
-                model: plugin.instrumentChoices
-                RadioButton {
-                    ButtonGroup.group: instrumentGroup
-                    text: Core.INSTRUMENTS[modelData].label
-                    checked: plugin.activeInstrument === modelData
-                    onClicked: plugin.setInstrument(modelData)
+            RowLayout {
+                Layout.fillWidth: true
+                Text {
+                    text: "Instrument:"
+                    color: writeFingers.palette.windowText
+                }
+                ButtonGroup { id: instrumentGroup }
+                Repeater {
+                    model: plugin.instrumentChoices
+                    RadioButton {
+                        ButtonGroup.group: instrumentGroup
+                        text: Core.INSTRUMENTS[modelData].label
+                        checked: plugin.activeInstrument === modelData
+                        onClicked: plugin.setInstrument(modelData)
+                    }
                 }
             }
-        }
-        CheckBox {
-            id: experimentalOpt
-            checked: plugin.experimental
-            text: "Experimental instruments (cello, 5-string violin)"
-            onClicked: plugin.setExperimental(checked)
+            CheckBox {
+                id: experimentalOpt
+                checked: plugin.experimental
+                text: "Experimental instruments (cello, 5-string violin)"
+                onClicked: plugin.setExperimental(checked)
+            }
         }
         Text {
             visible: plugin.blockedInstrument !== ""
@@ -705,6 +765,7 @@ MuseScore {
                 text: "Run"
                 onClicked: {
                     statusText.text = "Running...";
+                    plugin.refreshTarget();
                     try { plugin.apply(); }
                     catch (e) { statusText.text = "Exception while running: " + e + "\n" + (e.stack || "")
                         + "\nPlease report: https://github.com/knoguchi/violin-fingering/issues"; }
@@ -713,6 +774,7 @@ MuseScore {
             Button {
                 text: "Clear"
                 onClicked: {
+                    plugin.refreshTarget();
                     try { plugin.clearAnnotations(); }
                     catch (e) { statusText.text = "Exception while clearing: " + e + "\n" + (e.stack || "")
                         + "\nPlease report: https://github.com/knoguchi/violin-fingering/issues"; }

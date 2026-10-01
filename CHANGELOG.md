@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Selection wins: a range selection decides the staff (its first) and the
+  tick range; the Staff dropdown shows only with no selection. A summary
+  line names the target; Instrument and Experimental options are in a
+  collapsed section.
 - Per-instrument config: all tuning, hand-frame geometry and cost weights
   moved into `INSTRUMENTS` (violin, viola, cello) in the core; functions
   take an instrument name/config instead of a bare tuning. Violin and
