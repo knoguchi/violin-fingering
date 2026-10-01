@@ -661,3 +661,21 @@ test('cello: Bb major agrees with the book fingering on the closed-hand notes', 
         });
     }
 });
+
+// F# major, two octaves, as played by Kenji's cello teacher (relayed by Kenji, taken as
+// standard): 2 4 1 2 4 1 3 | 4 1 3 1 3 | 1 3 4. The middle part is a shifting 1-3 pair
+// pattern (a memorized convention, like E major) that the solver does not reproduce;
+// the opening and the final three notes agree.
+test('cello: F# major agrees with the teacher on the opening and the final three notes', function () {
+    const ps   = [42, 44, 46, 47, 49, 51, 53, 54, 56, 58, 59, 61, 63, 65, 66];
+    const want = [2, 4, 1, 2, 4, 1, 3, 4, 1, 3, 1, 3, 1, 3, 4];
+    const skip = [7, 8, 9, 10, 11];
+    for (const key of [6, 0, -2]) {                                   // key signature must not matter
+        const res = core.solveChords(melody(ps), key, 20, 'cello');
+        assert.ok(res);
+        res.forEach(function (r, i) {
+            if (skip.indexOf(i) >= 0) return;
+            assert.strictEqual(r.combo[0][FING], want[i], 'finger of note ' + i + ', key ' + key);
+        });
+    }
+});
