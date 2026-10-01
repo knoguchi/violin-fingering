@@ -715,3 +715,21 @@ test('cello: B major agrees with the teacher on the opening nine notes and the G
         });
     }
 });
+
+// A melodic minor (ascending), two octaves, as played by Kenji's cello teacher (relayed by
+// Kenji, taken as standard): 1 3 4 | 0 1 2 4 | 0 1 2 | 1 3 | 1 2 3. From the D string up it is
+// the same line and the same fingering as A major. F#3, G#4 and A4 use the open hand, which
+// the plugin does not model; the rest agrees.
+test('cello: A melodic minor agrees with the teacher except the open-hand notes', function () {
+    const ps   = [45, 47, 48, 50, 52, 54, 56, 57, 59, 60, 62, 64, 66, 68, 69];
+    const want = [1, 3, 4, 0, 1, 2, 4, 0, 1, 2, 1, 3, 1, 2, 3];
+    const skip = [5, 13, 14];
+    for (const key of [0, 3, -2]) {                                   // key signature must not matter
+        const res = core.solveChords(melody(ps), key, 20, 'cello');
+        assert.ok(res);
+        res.forEach(function (r, i) {
+            if (skip.indexOf(i) >= 0) return;
+            assert.strictEqual(r.combo[0][FING], want[i], 'finger of note ' + i + ', key ' + key);
+        });
+    }
+});
