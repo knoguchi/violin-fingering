@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.6.0-rc3 (2026-10-01)
 
 - Fix (cello): the major or minor key map was chosen from the whole piece, so a major
   piece that touches its relative minor (the Bach prelude has a D#) used the minor map
