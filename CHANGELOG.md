@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.6.0-rc1 (2026-10-01)
 
 - The plugin sits at the top level of the Plugins menu (no category), so it
   is one click away instead of under Composing/arranging tools.
