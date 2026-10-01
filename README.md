@@ -1,14 +1,17 @@
 # ViolinFingering
 
-Automatic violin fingering for MuseScore Studio 4.4+.
+Automatic fingering for violin, viola and (experimental) cello in
+MuseScore Studio 4.4+.
 
-Computes (string, finger, position) for every note of a violin score using
-position-aware Viterbi dynamic programming, and writes finger numbers and
-Roman-numeral position marks as annotations on the staff.
+Computes (string, finger, position) for every note of a violin, viola or
+cello score using position-aware Viterbi dynamic programming, and writes
+finger numbers and Roman-numeral position marks as annotations on the staff.
 
-The fingering is determined by the key signature: in each (string, position)
-the four fingers play four consecutive scale tones of the key. Accidentals
-displace a finger by a semitone from its key position. Chords are solved as
+For violin and viola the fingering is determined by the key signature: in each
+(string, position) the four fingers play four consecutive scale tones of the
+key. Accidentals displace a finger by a semitone from its key position. The
+cello (experimental) uses a chromatic hand frame instead: the four fingers of
+a position sit on consecutive semitones, whatever the key. Chords are solved as
 joint hand frames; harmonic notes (notated with both 0 and a finger digit)
 break the fingering chain into independently-optimized segments.
 
@@ -28,10 +31,19 @@ Annotated by the plugin:
 
 ![Annotated score](docs/images/annotated.png)
 
+## Cello (experimental)
+Cello support is new and was written without a cellist: the hand model, the
+cost weights and the use of the thumb are starting values, checked only
+against one piece (about 60% agreement with a human fingering of Bach's
+G major prelude). The dialog marks it "experimental" in red. If you play the
+cello, reports of what looks wrong are very welcome; a photo of a few bars
+with your own fingering is just as useful. See the issues link above.
+
 ## Setup
 1. Copy this folder to `Documents/MuseScore4/Plugins/` and restart MuseScore.
 2. Enable the plugin in Home > Plugins.
-3. Open a violin score and run the plugin from the Plugins menu.
+3. Open a violin, viola or cello score, select the measures you want (or
+   nothing for the whole staff) and run the plugin from the Plugins menu.
 
 ## Usage
 Select the measures you want fingered (a range on one staff) and run the
