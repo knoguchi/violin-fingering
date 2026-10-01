@@ -698,3 +698,20 @@ test('cello: Ab major agrees with the teacher except the start and the 1 3 2 4 g
         });
     }
 });
+
+// B major, two octaves, as played by Kenji's cello teacher (relayed by Kenji, taken as
+// standard): 2 4 1 2 4 1 3 4 1 | 3 1 3 | 1 | 2 3. The opening nine notes and the G# agree;
+// the shifting 1-3 pairs and the open-hand ending do not.
+test('cello: B major agrees with the teacher on the opening nine notes and the G#', function () {
+    const ps   = [47, 49, 51, 52, 54, 56, 58, 59, 61, 63, 64, 66, 68, 70, 71];
+    const want = [2, 4, 1, 2, 4, 1, 3, 4, 1, 3, 1, 3, 1, 2, 3];
+    const skip = [9, 10, 11, 13, 14];
+    for (const key of [5, 0, -3]) {                                   // key signature must not matter
+        const res = core.solveChords(melody(ps), key, 20, 'cello');
+        assert.ok(res);
+        res.forEach(function (r, i) {
+            if (skip.indexOf(i) >= 0) return;
+            assert.strictEqual(r.combo[0][FING], want[i], 'finger of note ' + i + ', key ' + key);
+        });
+    }
+});
