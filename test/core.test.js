@@ -350,3 +350,19 @@ test('cello: double stops land on contiguous strings', function () {
 test('cello: L/H labels disabled by config', function () {
     assert.strictEqual(core.INSTRUMENTS.cello.hand.hlEnabled, false);
 });
+
+// --- INSTRUMENTS consistency ---
+
+test('INSTRUMENTS: per-string and per-finger arrays match the config', function () {
+    Object.keys(core.INSTRUMENTS).forEach(function (name) {
+        const inst = core.INSTRUMENTS[name];
+        const n = inst.strings.tuning.length;
+        assert.strictEqual(inst.strings.names.length, n, name + ' strings.names');
+        assert.strictEqual(inst.strings.labels.length, n, name + ' strings.labels');
+        assert.strictEqual(inst.cost.open.length, n, name + ' cost.open');
+        assert.strictEqual(inst.hand.frameOffsets.length, 4, name + ' hand.frameOffsets');
+        assert.strictEqual(inst.cost.fingerCost.length, 4, name + ' cost.fingerCost');
+        assert.strictEqual(inst.cost.fingerHighPos.length, 4, name + ' cost.fingerHighPos');
+        assert.ok(inst.hand.minPosition <= inst.hand.maxPosition, name + ' position range');
+    });
+});
