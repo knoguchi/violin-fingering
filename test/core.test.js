@@ -502,3 +502,20 @@ test('cello: Bach G major prelude bar 1 uses the open strings in first position'
         assert.strictEqual(res[i].pos, 1, 'note ' + i + ' position');
     }
 });
+
+test('cello: C major scale across all four strings is 0 1 3 4 | 0 1 3 4 | 0 1 2 4 | 0 1 2, first position', function () {
+    // Fingering supplied by Kenji; it uses the two patterns the Suzuki Cello
+    // Book 1 parent handbook names (0-1-3-4, 0-1-2-4): 0-1-3-4 where the
+    // third step is a whole tone (C and G strings), 0-1-2-4 where it is a
+    // half tone (E-F on the D string), then 0-1-2 on the A string.
+    const ps   = [36, 38, 40, 41, 43, 45, 47, 48, 50, 52, 53, 55, 57, 59, 60];
+    const want = [0, 1, 3, 4, 0, 1, 3, 4, 0, 1, 2, 4, 0, 1, 2];
+    const strs = [0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3];   // C C C C G G G G D D D D A A A
+    for (const key of [0, 2, -3]) {                                  // key signature must not matter
+        const res = core.solveChords(melody(ps), key, 20, 'cello');
+        assert.ok(res);
+        assert.deepStrictEqual(res.map(function (r) { return r.combo[0][FING]; }), want, 'fingers, key ' + key);
+        assert.deepStrictEqual(res.map(function (r) { return r.combo[0][STR]; }), strs, 'strings, key ' + key);
+        res.forEach(function (r, i) { assert.strictEqual(r.pos, 1, 'note ' + i + ' position'); });
+    }
+});
