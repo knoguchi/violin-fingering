@@ -76,9 +76,7 @@ var DEFAULT_COST = {
     // fingers 1 and 2 as the hand goes up the neck.
     fingerCost: [0, 0, 0, 0],
     fingerHighPos: [0, 0, 0, 0],
-    highPosStart: 0,
-    // Departing from the instrument's key map (cello only; see CELLO_KEY_MAP).
-    keyMap: 0
+    highPosStart: 0
 };
 
 function withDefaults(over) {
@@ -87,76 +85,6 @@ function withDefaults(over) {
     for (var k2 in over) cost[k2] = over[k2];
     return cost;
 }
-
-// Cello key map: per key signature, the zero-cost (string index, finger) of each
-// scale tone, taken from a cellist's two-octave major and melodic minor scale
-// fingerings (a major key and its relative minor share a signature, so a pitch
-// can list both). Departing from it costs cost.keyMap, the way an accidental
-// costs on the violin. Strings are indexed low to high (0 = C).
-var CELLO_KEY_MAP = {
-    "-4": {
-        44: [[1,1]], 46: [[1,3]], 48: [[1,1]], 49: [[1,2]], 51: [[1,4]], 53: [[2,1]],
-        55: [[2,3]], 56: [[2,4]], 58: [[3,1]], 60: [[3,3]], 61: [[3,2]], 63: [[3,4]],
-        65: [[3,1]], 67: [[3,3]], 68: [[3,4]]
-    },
-    "-3": {
-        36: [[0,0]], 38: [[0,1]], 39: [[0,2]], 41: [[0,4]], 43: [[1,0]], 44: [[1,1]],
-        45: [[1,1]], 46: [[1,2]], 47: [[1,3]], 48: [[1,4]], 50: [[2,0]], 51: [[2,1]],
-        53: [[2,2]], 55: [[2,1],[2,4]], 56: [[2,2]], 57: [[3,0]], 58: [[2,4]], 59: [[3,1]],
-        60: [[3,1],[3,2]], 62: [[3,3]], 63: [[3,4]]
-    },
-    "-2": {
-        43: [[1,0]], 45: [[1,1]], 46: [[1,2]], 48: [[1,4]], 50: [[2,0]], 51: [[2,1]],
-        52: [[2,1]], 53: [[2,2]], 54: [[2,3]], 55: [[2,4]], 57: [[3,0]], 58: [[3,1]],
-        60: [[3,2]], 62: [[3,1],[3,4]], 63: [[3,2]], 64: [[3,1]], 65: [[3,4]], 66: [[3,3]],
-        67: [[3,1],[3,4]], 69: [[3,2]], 70: [[3,3]]
-    },
-    "-1": {
-        38: [[0,1]], 40: [[0,3]], 41: [[0,4]], 43: [[1,0]], 45: [[1,1]], 46: [[1,2]],
-        47: [[1,2]], 48: [[1,4]], 49: [[1,4]], 50: [[2,0]], 52: [[2,1]], 53: [[2,2]],
-        55: [[2,4]], 57: [[3,0]], 58: [[3,1]], 59: [[3,1]], 60: [[3,2]], 61: [[3,3]],
-        62: [[3,1],[3,4]], 64: [[3,3],[3,2]], 65: [[3,4]]
-    },
-    "0": {
-        36: [[0,0]], 38: [[0,1]], 40: [[0,3]], 41: [[0,4]], 43: [[1,0]], 45: [[1,1]],
-        47: [[1,3]], 48: [[1,4]], 50: [[2,0]], 52: [[2,1]], 53: [[2,2]], 54: [[2,2]],
-        55: [[2,4]], 56: [[2,4]], 57: [[3,0]], 59: [[3,1]], 60: [[3,2]], 62: [[3,1]],
-        64: [[3,3]], 66: [[3,1]], 68: [[3,2]], 69: [[3,3]]
-    },
-    "1": {
-        40: [[0,2]], 42: [[0,4]], 43: [[1,0]], 45: [[1,1]], 47: [[1,3],[1,2]], 48: [[1,4]],
-        49: [[1,4]], 50: [[2,0]], 51: [[2,1]], 52: [[2,1],[2,2]], 54: [[2,3],[2,4]],
-        55: [[2,4],[2,1]], 57: [[3,0],[2,2]], 59: [[3,1],[2,4]], 60: [[3,2]], 61: [[3,1]],
-        62: [[3,4]], 63: [[3,3]], 64: [[3,1],[3,4]], 66: [[3,3]], 67: [[3,4]]
-    },
-    "2": {
-        38: [[0,1]], 40: [[0,2]], 42: [[0,4]], 43: [[1,0]], 45: [[1,1]], 47: [[1,2],[1,1]],
-        49: [[1,4]], 50: [[2,0]], 52: [[2,1]], 54: [[2,3],[2,2]], 55: [[2,4]], 56: [[2,4]],
-        57: [[3,0]], 58: [[3,1]], 59: [[3,1],[3,2]], 61: [[3,3],[3,4]], 62: [[3,4],[3,1]],
-        64: [[3,2]], 66: [[3,4]], 68: [[3,1]], 70: [[3,3]], 71: [[3,4]]
-    },
-    "3": {
-        42: [[0,2]], 44: [[0,4]], 45: [[1,1]], 47: [[1,2]], 49: [[1,4]], 50: [[2,0]],
-        51: [[2,1]], 52: [[2,1]], 53: [[2,3]], 54: [[2,2],[2,4]], 56: [[2,4],[2,1]],
-        57: [[3,0],[2,2]], 59: [[3,1],[2,4]], 61: [[3,3],[3,1]], 62: [[3,1]], 63: [[3,3]],
-        64: [[3,3]], 65: [[3,3]], 66: [[3,1],[3,4]], 68: [[3,2]], 69: [[3,3]]
-    },
-    "4": {
-        40: [[0,1]], 42: [[0,2]], 44: [[0,4]], 45: [[1,1]], 47: [[1,2]], 49: [[1,4]],
-        51: [[2,1]], 52: [[2,2]], 54: [[2,4]], 56: [[2,1]], 57: [[2,2]], 59: [[2,4]],
-        61: [[3,1]], 63: [[3,3]], 64: [[3,4]]
-    },
-    "5": {
-        47: [[1,2]], 49: [[1,4]], 51: [[2,1]], 52: [[2,2]], 54: [[2,4]], 56: [[2,1]],
-        58: [[2,3]], 59: [[2,4]], 61: [[3,1]], 63: [[3,3]], 64: [[3,1]], 66: [[3,3]],
-        68: [[3,1]], 70: [[3,2]], 71: [[3,3]]
-    },
-    "6": {
-        42: [[0,2]], 44: [[0,4]], 46: [[1,1]], 47: [[1,2]], 49: [[1,4]], 51: [[2,1]],
-        53: [[2,3]], 54: [[2,4]], 56: [[2,1]], 58: [[2,3]], 59: [[3,1]], 61: [[3,3]],
-        63: [[3,1]], 65: [[3,3]], 66: [[3,4]]
-    }
-};
 
 var INSTRUMENTS = {
     violin: {
@@ -214,7 +142,6 @@ var INSTRUMENTS = {
             names: ["C", "G", "D", "A"],
             labels: ["①", "②", "③", "④"]
         },
-        keyMap: CELLO_KEY_MAP,
         hand: {
             frameModel: "chromatic",
             frameOffsets: [0, 1, 2, 3],
@@ -251,7 +178,6 @@ var INSTRUMENTS = {
                 chordPosSpanPair: 4,
                 // Fourth finger is rarely used in the lower positions and almost
                 // never up the neck; third thins out too (1/2 dominate high up).
-                keyMap: 0.2,
                 // The 5th entry is the thumb (see hand.thumb for when it
                 // may compete at all).
                 fingerCost: [0, 0, 0.05, 0.2, 0.5],
@@ -464,18 +390,6 @@ function posCost(inst, p) {
 
 // --- chord-aware (multi-note per event) ---------------
 
-// 1 when the instrument has a key map entry for this pitch and the candidate
-// (string, finger) is not among its choices; 0 otherwise.
-function keyMapMiss(km, cand) {
-    var opts = km && km[cand[4]];
-    if (!opts) return 0;
-    for (var i = 0; i < opts.length; i++)
-        if (opts[i][0] === cand[0] && opts[i][1] === cand[1]) return 0;
-    return 1;
-}
-
-function evKeyOf(key) { return key; }
-
 function candidatesForEvent(notes, key, maxPosition, instrument) {
     var inst = resolveInst(instrument);
     if (maxPosition === undefined) maxPosition = inst.hand.maxPosition;
@@ -494,11 +408,9 @@ function candidatesForEvent(notes, key, maxPosition, instrument) {
         // Mark candidates whose displacement direction contradicts the
         // note's spelling (+1 sharp side, -1 flat side, 0/absent unknown).
         var sp = notes[i].spell;
-        var km = inst.keyMap && inst.keyMap[evKeyOf(key)];
         cs = cs.map(function (c) {
             var d = c.slice();
             d[5] = (sp && d[3] !== 0 && d[3] !== sp) ? 1 : 0;
-            if (km) d[6] = keyMapMiss(km, d);
             return d;
         });
         perNote.push(cs);
@@ -565,7 +477,6 @@ function chordLocalCost(entry, inst) {
         if (k === 0) c += inst.cost.open[s];
         if (off !== 0) c += inst.cost.accidental;
         if (combo[i][5]) c += inst.cost.spell;
-        if (combo[i][6]) c += inst.cost.keyMap;
         if (k > 0) {
             positions.push(p);
             c += inst.cost.altLowString * Math.max(0, p - 1) * (top - s);

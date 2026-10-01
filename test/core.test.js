@@ -335,7 +335,7 @@ test('cello: first-position chromatic run stays in one position', function () {
 });
 
 test('cello: high melody prefers fingers 1-2 over 3-4 when it can shift', function () {
-    const r = core.solveChords(melody([72, 73, 72, 73, 72, 73, 72, 73]), 0, undefined, 'cello');
+    const r = core.solveChords(melody([69, 70, 69, 70, 69, 70, 69, 70]), 0, undefined, 'cello');
     r.forEach(function (e) { assert.ok(e.combo[0][FING] <= 2, 'finger ' + e.combo[0][FING]); });
 });
 
@@ -511,7 +511,7 @@ test('cello: C major scale across all four strings is 0 1 3 4 | 0 1 3 4 | 0 1 2 
     const ps   = [36, 38, 40, 41, 43, 45, 47, 48, 50, 52, 53, 55, 57, 59, 60];
     const want = [0, 1, 3, 4, 0, 1, 3, 4, 0, 1, 2, 4, 0, 1, 2];
     const strs = [0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3];   // C C C C G G G G D D D D A A A
-    for (const key of [0]) {                                   // own key: the cello key map applies
+    for (const key of [0, 2, -3]) {                                  // key signature must not matter
         const res = core.solveChords(melody(ps), key, 20, 'cello');
         assert.ok(res);
         assert.deepStrictEqual(res.map(function (r) { return r.combo[0][FING]; }), want, 'fingers, key ' + key);
@@ -552,7 +552,7 @@ test('cello: G major over two octaves is 0 1 3 4 | 0 1 3 4 | 0 1 2 4 | shift on 
     const ps   = [43, 45, 47, 48, 50, 52, 54, 55, 57, 59, 60, 62, 64, 66, 67];
     const want = [0, 1, 3, 4, 0, 1, 3, 4, 0, 1, 2, 4, 1, 3, 4];
     const strs = [1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3];   // G G G G D D D D A A A A A A A
-    for (const key of [1]) {                                   // own key: the cello key map applies
+    for (const key of [1, 0, -3]) {                                  // key signature must not matter
         const res = core.solveChords(melody(ps), key, 20, 'cello');
         assert.ok(res);
         assert.deepStrictEqual(res.map(function (r) { return r.combo[0][FING]; }), want, 'fingers, key ' + key);
@@ -572,7 +572,7 @@ const F_MAJOR_FING = [4, 0, 1, 2, 4, 0, 1, 2, 4, 0, 1, 2, 1, 3, 4];
 const F_MAJOR_STR  = [0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3];
 
 test('cello: F major agrees with the book fingering except the back-extended C on the A string', function () {
-    for (const key of [-1]) {                                   // own key: the cello key map applies
+    for (const key of [-1, 0, 2]) {                                   // key signature must not matter
         const res = core.solveChords(melody(F_MAJOR), key, 20, 'cello');
         assert.ok(res);
         res.forEach(function (r, i) {
@@ -598,7 +598,7 @@ const EB_MAJOR_FING = [2, 4, 0, 1, 2, 4, 0, 1, 2, 1, 2, 4, 1, 3, 4];
 const EB_MAJOR_STR  = [0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3];
 
 test('cello: Eb major agrees with the book fingering except F after the low first-finger Eb', function () {
-    for (const key of [-3]) {                                   // own key: the cello key map applies
+    for (const key of [-3, 0, 2]) {                                   // key signature must not matter
         const res = core.solveChords(melody(EB_MAJOR), key, 20, 'cello');
         assert.ok(res);
         res.forEach(function (r, i) {
@@ -625,7 +625,7 @@ const A_MAJOR_STR  = [1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3];
 
 test('cello: A major agrees with the book fingering on the closed-hand notes', function () {
     const open = [1, 5, 13, 14];                                      // B, F#, G#, A: open hand, see the todo
-    for (const key of [3]) {                                   // own key: the cello key map applies
+    for (const key of [3, 0, -2]) {                                   // key signature must not matter
         const res = core.solveChords(melody(A_MAJOR), key, 20, 'cello');
         assert.ok(res);
         res.forEach(function (r, i) {
@@ -652,7 +652,7 @@ test('cello: Bb major agrees with the book fingering on the closed-hand notes', 
     const ps   = [46, 48, 50, 51, 53, 55, 57, 58, 60, 62, 63, 65, 67, 69, 70];
     const want = [2, 4, 0, 1, 2, 4, 0, 1, 2, 1, 2, 4, 1, 2, 3];
     const skip = [8, 13, 14];
-    for (const key of [-2]) {                                   // own key: the cello key map applies
+    for (const key of [-2, 0, 3]) {                                   // key signature must not matter
         const res = core.solveChords(melody(ps), key, 20, 'cello');
         assert.ok(res);
         res.forEach(function (r, i) {
@@ -670,7 +670,7 @@ test('cello: F# major agrees with the teacher on the opening and the final three
     const ps   = [42, 44, 46, 47, 49, 51, 53, 54, 56, 58, 59, 61, 63, 65, 66];
     const want = [2, 4, 1, 2, 4, 1, 3, 4, 1, 3, 1, 3, 1, 3, 4];
     const skip = [7, 8, 9, 10, 11];
-    for (const key of [6]) {                                   // own key: the cello key map applies
+    for (const key of [6, 0, -2]) {                                   // key signature must not matter
         const res = core.solveChords(melody(ps), key, 20, 'cello');
         assert.ok(res);
         res.forEach(function (r, i) {
@@ -689,7 +689,7 @@ test('cello: Ab major agrees with the teacher except the start and the 1 3 2 4 g
     const ps   = [44, 46, 48, 49, 51, 53, 55, 56, 58, 60, 61, 63, 65, 67, 68];
     const want = [1, 3, 1, 2, 4, 1, 3, 4, 1, 3, 2, 4, 1, 3, 4];
     const skip = [0, 1, 10, 11];
-    for (const key of [-4]) {                                   // own key: the cello key map applies
+    for (const key of [-4, 0, 3]) {                                   // key signature must not matter
         const res = core.solveChords(melody(ps), key, 20, 'cello');
         assert.ok(res);
         res.forEach(function (r, i) {
@@ -706,7 +706,7 @@ test('cello: B major agrees with the teacher on the opening nine notes and the G
     const ps   = [47, 49, 51, 52, 54, 56, 58, 59, 61, 63, 64, 66, 68, 70, 71];
     const want = [2, 4, 1, 2, 4, 1, 3, 4, 1, 3, 1, 3, 1, 2, 3];
     const skip = [9, 10, 11, 13, 14];
-    for (const key of [5]) {                                   // own key: the cello key map applies
+    for (const key of [5, 0, -3]) {                                   // key signature must not matter
         const res = core.solveChords(melody(ps), key, 20, 'cello');
         assert.ok(res);
         res.forEach(function (r, i) {
@@ -724,7 +724,7 @@ test('cello: A melodic minor agrees with the teacher except the open-hand notes'
     const ps   = [45, 47, 48, 50, 52, 54, 56, 57, 59, 60, 62, 64, 66, 68, 69];
     const want = [1, 3, 4, 0, 1, 2, 4, 0, 1, 2, 1, 3, 1, 2, 3];
     const skip = [5, 13, 14];
-    for (const key of [0]) {                                   // own key: the cello key map applies
+    for (const key of [0, 3, -2]) {                                   // key signature must not matter
         const res = core.solveChords(melody(ps), key, 20, 'cello');
         assert.ok(res);
         res.forEach(function (r, i) {
@@ -742,7 +742,7 @@ test('cello: E melodic minor agrees with the teacher on the opening and the last
     const ps   = [40, 42, 43, 45, 47, 49, 51, 52, 54, 55, 57, 59, 61, 63, 64];
     const want = [2, 4, 0, 1, 2, 4, 1, 2, 4, 1, 2, 4, 1, 3, 4];
     const skip = [4, 8, 9, 10, 11, 12];
-    for (const key of [1]) {                                   // own key: the cello key map applies
+    for (const key of [1, 0, -3]) {                                   // key signature must not matter
         const res = core.solveChords(melody(ps), key, 20, 'cello');
         assert.ok(res);
         res.forEach(function (r, i) {
@@ -760,7 +760,7 @@ test('cello: D melodic minor agrees with the teacher except B2 and the last two 
     const ps   = [38, 40, 41, 43, 45, 47, 49, 50, 52, 53, 55, 57, 59, 61, 62, 64];
     const want = [1, 3, 4, 0, 1, 2, 4, 0, 1, 2, 4, 0, 1, 3, 4, 2];
     const skip = [5, 14, 15];
-    for (const key of [-1]) {                                   // own key: the cello key map applies
+    for (const key of [-1, 0, 3]) {                                   // key signature must not matter
         const res = core.solveChords(melody(ps), key, 20, 'cello');
         assert.ok(res);
         res.forEach(function (r, i) {
@@ -778,7 +778,7 @@ test('cello: B melodic minor agrees with the teacher on C#, D, E and the last th
     const ps   = [47, 49, 50, 52, 54, 56, 58, 59, 61, 62, 64, 66, 68, 70, 71];
     const want = [1, 4, 0, 1, 2, 4, 1, 2, 4, 1, 2, 4, 1, 3, 4];
     const keep = [1, 2, 3, 12, 13, 14];
-    for (const key of [2]) {                                   // own key: the cello key map applies
+    for (const key of [2, 0, -3]) {                                   // key signature must not matter
         const res = core.solveChords(melody(ps), key, 20, 'cello');
         assert.ok(res);
         keep.forEach(function (i) {
@@ -794,7 +794,7 @@ test('cello: G melodic minor agrees with the teacher except C4 and D4', function
     const ps   = [43, 45, 46, 48, 50, 52, 54, 55, 57, 58, 60, 62, 64, 66, 67];
     const want = [0, 1, 2, 4, 0, 1, 3, 4, 0, 1, 2, 4, 1, 3, 4];
     const skip = [10, 11];
-    for (const key of [-2]) {                                   // own key: the cello key map applies
+    for (const key of [-2, 0, 3]) {                                   // key signature must not matter
         const res = core.solveChords(melody(ps), key, 20, 'cello');
         assert.ok(res);
         res.forEach(function (r, i) {
@@ -811,7 +811,7 @@ test('cello: G melodic minor agrees with the teacher except C4 and D4', function
 test('cello: F# melodic minor agrees with the teacher on the last two notes', function () {
     const ps   = [42, 44, 45, 47, 49, 51, 53, 54, 56, 57, 59, 61, 63, 65, 66];
     const want = [2, 4, 1, 2, 4, 1, 3, 4, 1, 2, 4, 1, 3, 3, 4];
-    for (const key of [3]) {                                   // own key: the cello key map applies
+    for (const key of [3, 0, -2]) {                                   // key signature must not matter
         const res = core.solveChords(melody(ps), key, 20, 'cello');
         assert.ok(res);
         [13, 14].forEach(function (i) {
@@ -827,7 +827,7 @@ test('cello: C melodic minor across the four strings matches the teacher exactly
     const ps   = [36, 38, 39, 41, 43, 45, 47, 48, 50, 51, 53, 55, 57, 59, 60];
     const want = [0, 1, 2, 4, 0, 1, 3, 4, 0, 1, 2, 4, 0, 1, 2];
     const strs = [0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3];       // C C C C G G G G D D D D A A A
-    for (const key of [-3]) {                                   // own key: the cello key map applies
+    for (const key of [-3, 0, 2]) {                                   // key signature must not matter
         const res = core.solveChords(melody(ps), key, 20, 'cello');
         assert.ok(res);
         assert.deepStrictEqual(res.map(function (r) { return r.combo[0][FING]; }), want, 'fingers, key ' + key);
