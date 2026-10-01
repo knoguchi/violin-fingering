@@ -716,24 +716,12 @@ MuseScore {
             return;
         }
         var stats = writeAnnotations(events, result, key);
-        // Position distribution
-        var posDist = {};
-        for (var i = 0; i < result.length; i++) {
-            var st = result[i];
-            if (!st || st.harmonic) continue;
-            var p = st.pos;
-            posDist[p] = (posDist[p] || 0) + 1;
-        }
-        var posStr = Object.keys(posDist).sort().map(function (k) {
-            return "pos" + k + ":" + posDist[k];
-        }).join(" ");
-        statusText.text = "Instrument: " + activeInstrument + " / Key: " + key + " (" + (key > 0 ? key + " sharps" : key < 0 ? (-key) + " flats" : "C major / A minor") + ")\n"
-            + "Done: " + events.length + " events processed\n"
-            + (thumbProblem ? "Could not write the thumb sign: " + thumbProblem + "\n" : "")
-            + "Fingers written: " + stats.fing
-            + (writeStrings.checked ? " / strings: " + stats.str : "")
-            + (writePositions.checked ? " / positions: " + stats.pos : "")
-            + "\nPosition use: " + posStr;
+        statusText.text = "Done: " + events.length + " notes, "
+            + (key > 0 ? key + " sharps" : key < 0 ? (-key) + " flats" : "no accidentals") + "\n"
+            + (thumbProblem ? "Thumb sign not written: " + thumbProblem + "\n" : "")
+            + "Fingers " + stats.fing
+            + (writeStrings.checked ? ", strings " + stats.str : "")
+            + (writePositions.checked ? ", positions " + stats.pos : "");
     }
 
     // -- UI ----------------------------------------------
@@ -741,14 +729,6 @@ MuseScore {
         anchors.fill: parent
         anchors.margins: 14
         spacing: 6
-        Text {
-            Layout.fillWidth: true
-            wrapMode: Text.Wrap
-            // Plain Text defaults to black; follow the themed Controls
-            // palette so it stays readable in dark mode.
-            color: writeFingers.palette.windowText
-            text: "Computes fingering for the selected measures (or the whole staff) and writes finger numbers and position marks as annotations.\nExisting finger/string annotations are honored as constraints."
-        }
         Text {
             Layout.fillWidth: true
             wrapMode: Text.WordWrap
@@ -802,12 +782,27 @@ MuseScore {
             font.bold: true
             text: plugin.activeInst.label + " is experimental"
         }
-        CheckBox { id: writeFingers;   checked: true;  text: "Write left-hand finger numbers (1-4)" }
-        CheckBox { id: writeHL;        checked: false; enabled: activeInst.hand.hlEnabled; text: "Mark finger placement (1L, 2L, 3H, 4L; unmarked = 1-23-4)" }
-        CheckBox { id: writePositions; checked: true;  text: "Write positions (Roman numerals)" }
-        CheckBox { id: writeStrings;   checked: false; text: "Write string numbers (" + stringKey() + ")" }
-        CheckBox { id: colorize;       checked: true;  text: "Color auto-written annotations blue" }
-        CheckBox { id: overwrite;      checked: false; text: "Replace manual fingerings too (plugin's own are always replaced)" }
+        CheckBox { id: writeFingers;   checked: true;  text: "Finger numbers" }
+        CheckBox {
+            id: writeHL; checked: false; enabled: activeInst.hand.hlEnabled
+            text: "Finger placement (1L 2L 3H 4L)"
+            ToolTip.visible: hovered; ToolTip.delay: 400
+            ToolTip.text: "Suffix L/H where a finger is lower/higher than the 1-23-4 shape"
+        }
+        CheckBox { id: writePositions; checked: true;  text: "Positions (I, II, III...)" }
+        CheckBox {
+            id: writeStrings; checked: false
+            text: "String numbers"
+            ToolTip.visible: hovered; ToolTip.delay: 400
+            ToolTip.text: stringKey()
+        }
+        CheckBox { id: colorize;       checked: true;  text: "Color new marks blue" }
+        CheckBox {
+            id: overwrite; checked: false
+            text: "Replace my own fingerings"
+            ToolTip.visible: hovered; ToolTip.delay: 400
+            ToolTip.text: "Off: fingerings you wrote are kept and used as constraints"
+        }
         RowLayout {
             Button {
                 text: "Run"
@@ -838,7 +833,7 @@ MuseScore {
             TextEdit {
                 id: statusText
                 width: parent.width
-                text: "v1.5.0 (staff selector, viola support) - Run computes fingering for the chosen staff and writes annotations; re-running replaces the plugin's own annotations while manual ones are honored as constraints. Clear removes the plugin's annotations. Issues: github.com/knoguchi/violin-fingering"
+                text: "Ready."
                 wrapMode: TextEdit.Wrap
                 readOnly: true
                 selectByMouse: true
