@@ -170,8 +170,11 @@ var INSTRUMENTS = {
                 chordPosSpanPair: 4,
                 // Fourth finger is rarely used in the lower positions and almost
                 // never up the neck; third thins out too (1/2 dominate high up).
-                // The 5th entry is the thumb.
-                fingerCost: [0, 0, 0.05, 0.2, 0.3],
+                // The 5th entry is the thumb: a special case, not a regular
+                // finger. High enough that the solver picks it only when
+                // four-finger positions would be far worse; a hand-placed
+                // sign always wins (it pins the note).
+                fingerCost: [0, 0, 0.05, 0.2, 5],
                 fingerHighPos: [0, 0, 0.1, 0.3, 0],
                 highPosStart: 9
         })
