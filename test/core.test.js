@@ -769,3 +769,20 @@ test('cello: D melodic minor agrees with the teacher except B2 and the last two 
         });
     }
 });
+
+// B melodic minor (ascending), B2 to B4, as played by Kenji's cello teacher (relayed by Kenji,
+// taken as standard): 1 4 0 1 2 4 1 2 4 1 2 4 1 3 4. The opening B with finger 1 and C# with
+// finger 4 (a whole tone apart) fits none of the plugin's hand frames, and the middle is the
+// shifting 1-2-4 shape; only C#3, D3, E3 and G#4, A#4, B4 are asserted.
+test('cello: B melodic minor agrees with the teacher on C#, D, E and the last three notes', function () {
+    const ps   = [47, 49, 50, 52, 54, 56, 58, 59, 61, 62, 64, 66, 68, 70, 71];
+    const want = [1, 4, 0, 1, 2, 4, 1, 2, 4, 1, 2, 4, 1, 3, 4];
+    const keep = [1, 2, 3, 12, 13, 14];
+    for (const key of [2, 0, -3]) {                                   // key signature must not matter
+        const res = core.solveChords(melody(ps), key, 20, 'cello');
+        assert.ok(res);
+        keep.forEach(function (i) {
+            assert.strictEqual(res[i].combo[0][FING], want[i], 'finger of note ' + i + ', key ' + key);
+        });
+    }
+});
