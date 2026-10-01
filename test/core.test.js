@@ -642,3 +642,22 @@ test('cello: A major with the open hand (1 2 4 / 0 1 2 4 / ... / 1 2 3)',
     const res = core.solveChords(melody(A_MAJOR), 3, 20, 'cello');
     assert.deepStrictEqual(res.map(function (r) { return r.combo[0][FING]; }), A_MAJOR_FING);
 });
+
+// Bb major, two octaves, as supplied by Kenji: 2 4 | 0 1 2 4 | 0 1 2 | 1 2 4 | 1 2 3
+// (G string Bb C; D string D Eb F G; A string A Bb C, then D Eb F, then G A Bb).
+// Scale fingerings are conventions; the notes below are the ones where the
+// closed hand agrees. C4 (note 8) and A4, Bb4 (notes 13, 14) use the low first
+// finger and the open hand, which the plugin does not model.
+test('cello: Bb major agrees with the book fingering on the closed-hand notes', function () {
+    const ps   = [46, 48, 50, 51, 53, 55, 57, 58, 60, 62, 63, 65, 67, 69, 70];
+    const want = [2, 4, 0, 1, 2, 4, 0, 1, 2, 1, 2, 4, 1, 2, 3];
+    const skip = [8, 13, 14];
+    for (const key of [-2, 0, 3]) {                                   // key signature must not matter
+        const res = core.solveChords(melody(ps), key, 20, 'cello');
+        assert.ok(res);
+        res.forEach(function (r, i) {
+            if (skip.indexOf(i) >= 0) return;
+            assert.strictEqual(r.combo[0][FING], want[i], 'finger of note ' + i + ', key ' + key);
+        });
+    }
+});
