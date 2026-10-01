@@ -9,7 +9,7 @@ const golden = require('./golden.json');
 
 test('golden: violin/viola solveChords unchanged', function () {
     golden.forEach(function (c, i) {
-        const res = core.solveChords(c.events, c.key, 7, (c.inst === 'viola' ? core.VIOLA_TUNING : core.TUNING));
+        const res = core.solveChords(c.events, c.key, 7, c.inst);
         assert.deepStrictEqual(JSON.parse(JSON.stringify(res)), c.result,
             'case ' + i + ' ' + c.inst + ' key ' + c.key);
     });
