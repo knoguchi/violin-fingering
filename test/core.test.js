@@ -589,3 +589,29 @@ test('cello: F major C4 on the A string is finger 2 after a low first-finger Bb'
     const res = core.solveChords(melody(F_MAJOR), -1, 20, 'cello');
     assert.deepStrictEqual(res.map(function (r) { return r.combo[0][FING]; }), F_MAJOR_FING);
 });
+
+// Eb major, two octaves, as supplied by Kenji:
+//   C string Eb F = 2 4 | G string G Ab Bb C = 0 1 2 4 | D string D Eb F = 0 1 2 (Eb with a
+//   back-extended first finger) | D string G Ab Bb = 1 2 4 | A string C D Eb = 1 3 4
+const EB_MAJOR = [39, 41, 43, 44, 46, 48, 50, 51, 53, 55, 56, 58, 60, 62, 63];
+const EB_MAJOR_FING = [2, 4, 0, 1, 2, 4, 0, 1, 2, 1, 2, 4, 1, 3, 4];
+const EB_MAJOR_STR  = [0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3];
+
+test('cello: Eb major agrees with the book fingering except F after the low first-finger Eb', function () {
+    for (const key of [-3, 0, 2]) {                                   // key signature must not matter
+        const res = core.solveChords(melody(EB_MAJOR), key, 20, 'cello');
+        assert.ok(res);
+        res.forEach(function (r, i) {
+            if (i === 8) return;                                       // F3 on the D string: see the todo
+            assert.strictEqual(r.combo[0][FING], EB_MAJOR_FING[i], 'finger of note ' + i + ', key ' + key);
+            assert.strictEqual(r.combo[0][STR], EB_MAJOR_STR[i], 'string of note ' + i + ', key ' + key);
+        });
+    }
+});
+
+test('cello: Eb major F3 on the D string is finger 2 after a low first-finger Eb',
+     {todo: 'needs the back-extended first finger: the plugin stays in half position and plays F with 3'},
+     function () {
+    const res = core.solveChords(melody(EB_MAJOR), -3, 20, 'cello');
+    assert.deepStrictEqual(res.map(function (r) { return r.combo[0][FING]; }), EB_MAJOR_FING);
+});
