@@ -504,7 +504,7 @@ test('cello: Bach G major prelude bar 1 uses the open strings in first position'
 });
 
 test('cello: C major scale across all four strings is 0 1 3 4 | 0 1 3 4 | 0 1 2 4 | 0 1 2, first position', function () {
-    // Fingering supplied by Kenji; it uses the two patterns the Suzuki Cello
+    // Fingering as played by Kenji's cello teacher (relayed by Kenji, taken as standard); it uses the two patterns the Suzuki Cello
     // Book 1 parent handbook names (0-1-3-4, 0-1-2-4): 0-1-3-4 where the
     // third step is a whole tone (C and G strings), 0-1-2-4 where it is a
     // half tone (E-F on the D string), then 0-1-2 on the A string.
@@ -520,7 +520,7 @@ test('cello: C major scale across all four strings is 0 1 3 4 | 0 1 3 4 | 0 1 2 
     }
 });
 
-// D major, two octaves, first position, as supplied by Kenji:
+// D major, two octaves, first position, as played by Kenji's cello teacher (relayed by Kenji, taken as standard):
 //   C string D E F# = 1 2 4 | G string G A B C# = 0 1 2 4 | D string 0 1 3 4 | A string 0 1 3 4
 // The C and G string groups use the open hand (extension: whole tones between
 // fingers 1, 2 and 4), which the plugin's closed-hand frame cannot express yet.
@@ -545,7 +545,7 @@ test('cello: D major over two octaves with the open hand (extension) is 1 2 4 | 
 });
 
 test('cello: G major over two octaves is 0 1 3 4 | 0 1 3 4 | 0 1 2 4 | shift on the A string | 1 3 4', function () {
-    // Supplied by Kenji. The last three notes (E F# G) are played 1 3 4 after a
+    // As played by Kenji's cello teacher (relayed by Kenji, taken as standard). The last three notes (E F# G) are played 1 3 4 after a
     // shift on the A string. The shifted position is checked only as "one
     // position above I, the same for the three notes": the plugin writes the
     // chromatic index (VI) where the Suzuki handbook says "4th position".
@@ -564,7 +564,7 @@ test('cello: G major over two octaves is 0 1 3 4 | 0 1 3 4 | 0 1 2 4 | shift on 
     }
 });
 
-// F major, two octaves, as supplied by Kenji:
+// F major, two octaves, as played by Kenji's cello teacher (relayed by Kenji, taken as standard):
 //   C string F = 4 | G string G A Bb C = 0 1 2 4 | D string D E F G = 0 1 2 4 |
 //   A string A Bb C = 0 1 2 (Bb with a back-extended first finger, C with 2) | shift | D E F = 1 3 4
 const F_MAJOR = [41, 43, 45, 46, 48, 50, 52, 53, 55, 57, 58, 60, 62, 64, 65];
@@ -590,7 +590,7 @@ test('cello: F major C4 on the A string is finger 2 after a low first-finger Bb'
     assert.deepStrictEqual(res.map(function (r) { return r.combo[0][FING]; }), F_MAJOR_FING);
 });
 
-// Eb major, two octaves, as supplied by Kenji:
+// Eb major, two octaves, as played by Kenji's cello teacher (relayed by Kenji, taken as standard):
 //   C string Eb F = 2 4 | G string G Ab Bb C = 0 1 2 4 | D string D Eb F = 0 1 2 (Eb with a
 //   back-extended first finger) | D string G Ab Bb = 1 2 4 | A string C D Eb = 1 3 4
 const EB_MAJOR = [39, 41, 43, 44, 46, 48, 50, 51, 53, 55, 56, 58, 60, 62, 63];
@@ -616,7 +616,7 @@ test('cello: Eb major F3 on the D string is finger 2 after a low first-finger Eb
     assert.deepStrictEqual(res.map(function (r) { return r.combo[0][FING]; }), EB_MAJOR_FING);
 });
 
-// A major, two octaves, as supplied by Kenji:
+// A major, two octaves, as played by Kenji's cello teacher (relayed by Kenji, taken as standard):
 //   G string A B C# = 1 2 4 | D string D E F# G# = 0 1 2 4 | A string A B C# = 0 1 3 |
 //   D E = 1 3 (shifted) | F# G# A = 1 2 3 (shifted, open hand)
 const A_MAJOR = [45, 47, 49, 50, 52, 54, 56, 57, 59, 61, 62, 64, 66, 68, 69];
@@ -643,7 +643,7 @@ test('cello: A major with the open hand (1 2 4 / 0 1 2 4 / ... / 1 2 3)',
     assert.deepStrictEqual(res.map(function (r) { return r.combo[0][FING]; }), A_MAJOR_FING);
 });
 
-// Bb major, two octaves, as supplied by Kenji: 2 4 | 0 1 2 4 | 0 1 2 | 1 2 4 | 1 2 3
+// Bb major, two octaves, as played by Kenji's cello teacher (relayed by Kenji, taken as standard): 2 4 | 0 1 2 4 | 0 1 2 | 1 2 4 | 1 2 3
 // (G string Bb C; D string D Eb F G; A string A Bb C, then D Eb F, then G A Bb).
 // Scale fingerings are conventions; the notes below are the ones where the
 // closed hand agrees. C4 (note 8) and A4, Bb4 (notes 13, 14) use the low first
