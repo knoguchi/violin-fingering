@@ -293,3 +293,60 @@ test('hlLabel: every solved note gets a well-formed label', function () {
         assert.strictEqual(parseInt(lab), c[FING]);
     });
 });
+
+// --- cello ---
+
+test('cello: tuning, detection', function () {
+    assert.deepStrictEqual(core.INSTRUMENTS.cello.tuning, [36, 43, 50, 57]);
+    assert.strictEqual(core.detectInstrument('strings.cello'), 'cello');
+    assert.strictEqual(core.detectInstrument('strings.viola'), 'viola');
+    assert.strictEqual(core.detectInstrument('strings.violin'), 'violin');
+    assert.strictEqual(core.detectInstrument('wind.flute'), '');
+});
+
+test('cello: chromatic frame ignores the key signature', function () {
+    for (const key of [0, 3, -4]) {
+        assert.strictEqual(core.fingerPitch(3, 1, 1, key, 'cello'), 59);  // A string, f1 = B3
+        assert.strictEqual(core.fingerPitch(3, 1, 4, key, 'cello'), 62);  // f4 = D4
+    }
+});
+
+test('cello: open strings, half position, range floor', function () {
+    const c = core.candidatesForPitch(36, 0, undefined, 'cello');
+    assert.ok(c.some(function (x) { return x[STR] === 0 && x[FING] === 0; }));
+    // C#2 only exists as half position finger 1 on the C string
+    const cs = core.candidatesForPitch(37, 0, undefined, 'cello');
+    assert.ok(cs.length > 0 && cs.every(function (x) { return x[STR] === 0 && x[POS] === 0; }));
+    assert.strictEqual(core.candidatesForPitch(35, 0, undefined, 'cello').length, 0);
+});
+
+test('cello: no accidental displacement, every candidate is in frame', function () {
+    core.candidatesForPitch(62, 2, undefined, 'cello').forEach(function (c) {
+        assert.strictEqual(c[OFF], 0);
+    });
+});
+
+test('cello: first-position chromatic run stays in one position', function () {
+    // D3(open) E3 F3 F#3 G3 on the D string: open, then f1..f? within one frame
+    const r = core.solveChords(melody([52, 53, 54, 55]), 0, undefined, 'cello');
+    assert.ok(r);
+    const pos = r.map(function (e) { return e.pos; });
+    assert.ok(pos.every(function (p) { return p === pos[0]; }), 'one position: ' + pos);
+});
+
+test('cello: high melody prefers fingers 1-2 over 3-4 when it can shift', function () {
+    const r = core.solveChords(melody([69, 70, 69, 70, 69, 70, 69, 70]), 0, undefined, 'cello');
+    r.forEach(function (e) { assert.ok(e.combo[0][FING] <= 2, 'finger ' + e.combo[0][FING]); });
+});
+
+test('cello: double stops land on contiguous strings', function () {
+    // C2 + A3: the wide interval cannot sit on strings 0 and 3
+    const r = core.solveChords([{pitches: [{pitch: 36}, {pitch: 57}]}], 0, undefined, 'cello');
+    assert.ok(r);
+    const ss = r[0].combo.map(function (c) { return c[STR]; }).sort();
+    assert.strictEqual(ss[1] - ss[0], 1);
+});
+
+test('cello: L/H labels disabled by config', function () {
+    assert.strictEqual(core.INSTRUMENTS.cello.hlEnabled, false);
+});

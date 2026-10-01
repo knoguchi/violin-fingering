@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Per-instrument config: all tuning, hand-frame geometry and cost weights
+  moved into `INSTRUMENTS` (violin, viola, cello) in the core; functions
+  take an instrument name/config instead of a bare tuning. Violin and
+  viola output is unchanged (golden snapshot test).
+- Cello (first cut): chromatic hand frame incl. half position, cello
+  weights favoring fingers 1-2 high up the neck. No thumb position yet.
+- Instrument radio buttons (Violin/Viola/Cello), pre-selected from the
+  part and remembered between runs. String-number key follows the
+  instrument.
+
 - Finger placement indicators (#4): optional `1L`/`2L`/`3H`/`4L` suffixes
   on finger numbers, relative to the 1-23-4 hand shape. First position is
   anchored to the nut (key-independent); higher positions to the hand

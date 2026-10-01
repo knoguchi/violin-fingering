@@ -37,8 +37,10 @@ Annotated by the plugin:
 The **Staff** dropdown picks the part to process (one staff at a time);
 it defaults to the staff of the current selection. A range selection
 narrows the tick window; with none, the whole score is processed. The
-staff's instrument is detected from the part: violin and viola are
-supported (viola uses C-G-D-A tuning, same hand model a fifth lower).
+staff's instrument is pre-selected from the part (Violin / Viola / Cello
+radio buttons; override them if detection is wrong, and the last choice
+is remembered). Viola uses C-G-D-A tuning with the same hand model a fifth
+lower; cello uses a chromatic (semitone-per-finger) hand frame.
 Repeat per part in a multi-part score.
 
 - **Run**: computes fingering for the selection (or the whole score) and writes
@@ -87,8 +89,9 @@ constraints like plain digits.
 - Harmonics split the piece into independent segments
 
 ## Known limitations
-- Violin (G3 D4 A4 E5) and viola (C3 G3 D4 A4) only; cello's fingering
-  model (semitone frames, thumb position) is different and unsupported
+- Cello support is a first cut: chromatic frame with half position, no
+  thumb position or extensions yet, weights untuned (all per-instrument
+  values live in `INSTRUMENTS` in `violin_fingering_core.js`)
 - Harmonics (other than the 0+finger notation) are not specially detected
 - Pizzicato, col legno, and other special techniques are processed as
   ordinary notes
