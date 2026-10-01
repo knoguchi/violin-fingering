@@ -9,9 +9,8 @@ let seed = 12345;
 function rnd(n) { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed % n; }
 
 const CASES = [];
-const tunings = {violin: core.TUNING, viola: core.VIOLA_TUNING};
-for (const inst of Object.keys(tunings)) {
-    const lo = tunings[inst][0];
+for (const inst of ['violin', 'viola']) {
+    const lo = core.INSTRUMENTS[inst].strings.tuning[0];
     for (const key of [0, 2, -3, 4, -1]) {
         for (let r = 0; r < 6; r++) {
             const events = [];
@@ -36,6 +35,6 @@ for (const inst of Object.keys(tunings)) {
     }
 }
 for (const c of CASES)
-    c.result = core.solveChords(c.events, c.key, 7, tunings[c.inst]);
+    c.result = core.solveChords(c.events, c.key, 7, c.inst);
 fs.writeFileSync(path.join(__dirname, 'golden.json'), JSON.stringify(CASES));
 console.log(CASES.length, 'cases,', CASES.filter(c => c.result === null).length, 'unsolvable');

@@ -192,12 +192,12 @@ test('viola tuning: the C string exists, violin range check unchanged', function
     // C3 is the viola's open C - unplayable on a violin.
     assert.strictEqual(core.solveChords(melody([48]), 0, 7), null,
         'C3 unplayable on violin');
-    var res = core.solveChords(melody([48]), 0, 7, core.VIOLA_TUNING);
+    var res = core.solveChords(melody([48]), 0, 7, "viola");
     assert.strictEqual(res[0].combo[0][STR], 0, 'lowest string');
     assert.strictEqual(res[0].combo[0][FING], 0, 'open C');
     // E3 = 2nd finger on the C string in first position (C major frame
     // above C3: D E F G).
-    var e3 = core.solveChords(melody([52]), 0, 7, core.VIOLA_TUNING);
+    var e3 = core.solveChords(melody([52]), 0, 7, "viola");
     assert.strictEqual(e3[0].combo[0][STR], 0);
     assert.strictEqual(e3[0].combo[0][FING], 2);
     assert.strictEqual(e3[0].pos, 1);
@@ -211,7 +211,7 @@ test('viola tuning: barre fifths detected against viola strings', function () {
     };
     // E3 (C string, fret 4) -> B3 (G string, fret 4): one-finger barre.
     var c = core.chordTransCost(st(0, 2, 1, 0, 52), st(1, 2, 1, 0, 59),
-                                core.VIOLA_TUNING);
+                                "viola");
     assert.ok(c < 1.0, 'barre discount applies (got ' + c + ')');
 });
 
@@ -280,7 +280,7 @@ test('hlLabel: same pitch, different position, different label', function () {
 test('hlLabel: viola uses the same shapes a fifth lower', function () {
     // C major, viola D string (index 2 = D4): E F G A -> F is low 2
     assert.deepStrictEqual(
-        labels(2, 1, 0, [[64, 1], [65, 2], [67, 3], [69, 4]], core.VIOLA_TUNING),
+        labels(2, 1, 0, [[64, 1], [65, 2], [67, 3], [69, 4]], "viola"),
         ['1', '2L', '3', '4']);
 });
 
@@ -297,7 +297,7 @@ test('hlLabel: every solved note gets a well-formed label', function () {
 // --- cello ---
 
 test('cello: tuning, detection', function () {
-    assert.deepStrictEqual(core.INSTRUMENTS.cello.tuning, [36, 43, 50, 57]);
+    assert.deepStrictEqual(core.INSTRUMENTS.cello.strings.tuning, [36, 43, 50, 57]);
     assert.strictEqual(core.detectInstrument('strings.cello'), 'cello');
     assert.strictEqual(core.detectInstrument('strings.viola'), 'viola');
     assert.strictEqual(core.detectInstrument('strings.violin'), 'violin');
@@ -348,5 +348,5 @@ test('cello: double stops land on contiguous strings', function () {
 });
 
 test('cello: L/H labels disabled by config', function () {
-    assert.strictEqual(core.INSTRUMENTS.cello.hlEnabled, false);
+    assert.strictEqual(core.INSTRUMENTS.cello.hand.hlEnabled, false);
 });

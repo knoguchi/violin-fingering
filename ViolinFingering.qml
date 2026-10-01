@@ -94,9 +94,9 @@ MuseScore {
 
     // "①=E, ②=A, ③=D, ④=G" for the active instrument.
     function stringKey() {
-        var n = activeInst.tuning.length, out = [];
+        var n = activeInst.strings.tuning.length, out = [];
         for (var i = 0; i < n; i++)
-            out.push(activeInst.stringLabels[i] + "=" + activeInst.stringNames[n - 1 - i]);
+            out.push(activeInst.strings.labels[i] + "=" + activeInst.strings.names[n - 1 - i]);
         return out.join(", ");
     }
 
@@ -328,7 +328,7 @@ MuseScore {
         // removal instead and never become constraints.
         var out = {string: null, finger: null, harmonic: false};
         if (!note.elements) return out;
-        var isOpenStringPitch = activeInst.tuning.indexOf(note.pitch) >= 0;
+        var isOpenStringPitch = activeInst.strings.tuning.indexOf(note.pitch) >= 0;
         var plainDigits = [], humanEls = [];
         for (var i = 0; i < note.elements.length; i++) {
             var el = note.elements[i];
@@ -472,7 +472,7 @@ MuseScore {
                     nFing++;
                 }
                 if (writeStrings.checked && !hadString) {
-                    var stringNum = activeInst.tuning.length - s;
+                    var stringNum = activeInst.strings.tuning.length - s;
                     var sn = newElement(Element.FINGERING);
                     // Real string number = FINGERING with the String Number
                     // text style; MuseScore draws the circle itself.
@@ -484,7 +484,7 @@ MuseScore {
                         }
                     } catch (e3) {}
                     sn.text = styled ? "" + stringNum
-                                     : activeInst.stringLabels[stringNum - 1];
+                                     : activeInst.strings.labels[stringNum - 1];
                     sn.color = markerColor;
                     noteRefs[0].add(sn);
                     newItems.push([events[i].tick, pitchInfo.midi, "s", sn.text, targetStaff]);
@@ -652,7 +652,7 @@ MuseScore {
             }
         }
         CheckBox { id: writeFingers;   checked: true;  text: "Write left-hand finger numbers (1-4)" }
-        CheckBox { id: writeHL;        checked: false; enabled: activeInst.hlEnabled; text: "Mark finger placement (1L, 2L, 3H, 4L; unmarked = 1-23-4)" }
+        CheckBox { id: writeHL;        checked: false; enabled: activeInst.hand.hlEnabled; text: "Mark finger placement (1L, 2L, 3H, 4L; unmarked = 1-23-4)" }
         CheckBox { id: writePositions; checked: true;  text: "Write positions (Roman numerals)" }
         CheckBox { id: writeStrings;   checked: false; text: "Write string numbers (" + stringKey() + ")" }
         CheckBox { id: colorize;       checked: true;  text: "Color auto-written annotations blue" }

@@ -7,11 +7,16 @@
 // position), the four fingers play four consecutive scale tones. An
 // accidental displaces the finger by +/-1 semitone from its key position.
 
-// Everything instrument-specific lives in INSTRUMENTS: tuning, hand frame
-// geometry and every cost weight. Functions take an instrument (name or
-// config object) as their trailing argument; omitted means violin.
-// Viola is the same hand a fifth lower, so it shares violin's weights.
-var VIOLIN_COST = {
+// Everything instrument-specific lives in INSTRUMENTS. Each instrument has
+//   strings: what it is   - tuning, names, labels
+//   hand:    left-hand geometry - frame model, finger offsets, positions
+//   cost:    weights the solver minimises
+// Functions take an instrument (name or config object) as their trailing
+// argument; omitted means violin.
+
+// Cost weights shared by instruments that do not override them. These are
+// the violin's; viola is the same hand a fifth lower, so it uses them as is.
+var DEFAULT_COST = {
     // Position shifts: fixed + per position of distance.
     posShift: 3.0,
     posFixed: 2.5,
@@ -72,97 +77,100 @@ var VIOLIN_COST = {
     highPosStart: 0
 };
 
-function makeInstrument(over) {
-    var inst = {};
-    for (var k in VIOLIN_COST) inst[k] = VIOLIN_COST[k];
-    for (var k2 in over) inst[k2] = over[k2];
-    return inst;
+function withDefaults(over) {
+    var cost = {};
+    for (var k in DEFAULT_COST) cost[k] = DEFAULT_COST[k];
+    for (var k2 in over) cost[k2] = over[k2];
+    return cost;
 }
 
 var INSTRUMENTS = {
-    violin: makeInstrument({
+    violin: {
         name: "violin",
-        tuning: [55, 62, 69, 76],              // G3 D4 A4 E5 (low to high)
-        stringNames: ["G", "D", "A", "E"],
-        // Circled string numbers, index = string number - 1 (1 = highest).
-        stringLabels: ["①", "②", "③", "④"],
-        frameModel: "diatonic",
-        // Semitone offsets of fingers 1-4 for the 1-23-4 hand shape, and
-        // the first-position anchor above the open string (L/H labels).
-        frameOffsets: [0, 2, 3, 5],
-        frameAnchor: 2,
-        hlEnabled: true,
-        maxPosition: 7,
-        minPosition: 1,
         detect: /violin/i,
-        pitchRange: [55, 103]
-    }),
-    viola: makeInstrument({
+        strings: {
+            tuning: [55, 62, 69, 76],          // G3 D4 A4 E5 (low to high)
+            names: ["G", "D", "A", "E"],
+            // Circled string numbers, index = string number - 1 (1 = highest).
+            labels: ["①", "②", "③", "④"]
+        },
+        hand: {
+            frameModel: "diatonic",
+            // Semitone offsets of fingers 1-4 for the 1-23-4 hand shape, and
+            // the first-position anchor above the open string (L/H labels).
+            frameOffsets: [0, 2, 3, 5],
+            frameAnchor: 2,
+            hlEnabled: true,
+            minPosition: 1,
+            maxPosition: 7
+        },
+        cost: DEFAULT_COST
+    },
+    viola: {
         name: "viola",
-        tuning: [48, 55, 62, 69],              // C3 G3 D4 A4
-        stringNames: ["C", "G", "D", "A"],
-        stringLabels: ["①", "②", "③", "④"],
-        frameModel: "diatonic",
-        frameOffsets: [0, 2, 3, 5],
-        frameAnchor: 2,
-        hlEnabled: true,
-        maxPosition: 7,
-        minPosition: 1,
         detect: /viola/i,
-        pitchRange: [48, 96]
-    })
+        strings: {
+            tuning: [48, 55, 62, 69],          // C3 G3 D4 A4
+            names: ["C", "G", "D", "A"],
+            labels: ["①", "②", "③", "④"]
+        },
+        hand: {
+            frameModel: "diatonic",
+            frameOffsets: [0, 2, 3, 5],
+            frameAnchor: 2,
+            hlEnabled: true,
+            minPosition: 1,
+            maxPosition: 7
+        },
+        cost: DEFAULT_COST
+    },
+    // Cello: chromatic hand frame - the four fingers of a position sit on
+    // consecutive semitones, so key signature and accidental displacement play
+    // no role (a position is a semitone step, not a scale step). Starting
+    // weights, to be tuned against real cello fingerings.
+    cello: {
+        name: "cello",
+        detect: /cello/i,
+        strings: {
+            tuning: [36, 43, 50, 57],          // C2 G2 D3 A3
+            names: ["C", "G", "D", "A"],
+            labels: ["①", "②", "③", "④"]
+        },
+        hand: {
+            frameModel: "chromatic",
+            frameOffsets: [0, 1, 2, 3],
+            frameAnchor: 2,
+            hlEnabled: false,
+            minPosition: 0,         // half position: finger 1 a semitone above the open string
+            maxPosition: 20
+        },
+        cost: withDefaults({
+                // One position step is a semitone: shifts are cheaper per step, the
+                // hand frame is exactly one semitone per finger, chords may spread
+                // over more steps.
+                posShift: 1.0,
+                posFixed: 2.0,
+                stretchPerFinger: 1,
+                open: [0.15, 0.2, 0.3, 0.45],
+                posCost: [0, 0, 0.08, 0.08, 0.06, 0.06, 0.1, 0.1, 0.12, 0.14, 0.16, 0.18, 0.2],
+                posCostSlope: 0.08,
+                altLowString: 0.015,
+                posSpread: 0.25,
+                chordPosSpan: 2,
+                chordPosSpanPair: 4,
+                // Fourth finger is rarely used in the lower positions and almost
+                // never up the neck; third thins out too (1/2 dominate high up).
+                fingerCost: [0, 0, 0.05, 0.2],
+                fingerHighPos: [0, 0, 0.1, 0.3],
+                highPosStart: 9
+        })
+    }
 };
 
-// Cello: chromatic hand frame - the four fingers of a position sit on
-// consecutive semitones, so key signature and accidental displacement play
-// no role (a position is a semitone step, not a scale step). Starting
-// weights, to be tuned against real cello fingerings.
-INSTRUMENTS.cello = makeInstrument({
-    name: "cello",
-    tuning: [36, 43, 50, 57],                  // C2 G2 D3 A3
-    stringNames: ["C", "G", "D", "A"],
-    stringLabels: ["①", "②", "③", "④"],
-    frameModel: "chromatic",
-    frameOffsets: [0, 1, 2, 3],
-    frameAnchor: 2,
-    hlEnabled: false,
-    maxPosition: 20,
-    minPosition: 0,             // half position: finger 1 a semitone above the open string
-    detect: /cello/i,
-    pitchRange: [36, 88],
-    // One position step is a semitone: shifts are cheaper per step, the
-    // hand frame is exactly one semitone per finger, chords may spread
-    // over more steps.
-    posShift: 1.0,
-    posFixed: 2.0,
-    stretchPerFinger: 1,
-    open: [0.15, 0.2, 0.3, 0.45],
-    posCost: [0, 0, 0.08, 0.08, 0.06, 0.06, 0.1, 0.1, 0.12, 0.14, 0.16, 0.18, 0.2],
-    posCostSlope: 0.08,
-    altLowString: 0.015,
-    posSpread: 0.25,
-    chordPosSpan: 2,
-    chordPosSpanPair: 4,
-    // Fourth finger is rarely used in the lower positions and almost
-    // never up the neck; third thins out too (1/2 dominate high up).
-    fingerCost: [0, 0, 0.05, 0.2],
-    fingerHighPos: [0, 0, 0.1, 0.3],
-    highPosStart: 9
-});
-
-// Accepts an instrument name, a config object, or (legacy) a bare tuning
-// array; anything else means violin.
+// Accepts an instrument name or a config object; anything else means violin.
 function resolveInst(x) {
-    if (!x) return INSTRUMENTS.violin;
     if (typeof x === "string") return INSTRUMENTS[x] || INSTRUMENTS.violin;
-    if (x.tuning) return x;
-    for (var n in INSTRUMENTS)
-        if (INSTRUMENTS[n].tuning.join() === x.join()) return INSTRUMENTS[n];
-    return makeInstrument({tuning: x, name: "custom",
-        stringNames: INSTRUMENTS.violin.stringNames,
-        stringLabels: INSTRUMENTS.violin.stringLabels,
-        frameModel: "diatonic", frameOffsets: [0, 2, 3, 5], frameAnchor: 2,
-        hlEnabled: true, maxPosition: 7, minPosition: 1});
+    return x || INSTRUMENTS.violin;
 }
 
 // Instrument for a part's id string (MuseScore instrumentId / musicXmlId),
@@ -172,11 +180,6 @@ function detectInstrument(id) {
         if (INSTRUMENTS[n].detect.test(id || "")) return n;
     return "";
 }
-
-// Kept for callers that predate INSTRUMENTS.
-var TUNING = INSTRUMENTS.violin.tuning;
-var VIOLA_TUNING = INSTRUMENTS.viola.tuning;
-var STRING_NAMES = INSTRUMENTS.violin.stringNames;
 
 var SHARP_ORDER = [6, 1, 8, 3, 10, 5, 0];   // F# C# G# D# A# E# B# (mod 12)
 var FLAT_ORDER  = [10, 3, 8, 1, 6, 11, 4];  // Bb Eb Ab Db Gb Cb Fb
@@ -204,9 +207,9 @@ function keyScale(key) {
 
 function fingerPitch(stringIdx, position, finger, key, instrument) {
     var inst = resolveInst(instrument);
-    var open = inst.tuning[stringIdx];
-    if (inst.frameModel === "chromatic")
-        return open + 1 + position + inst.frameOffsets[finger - 1];
+    var open = inst.strings.tuning[stringIdx];
+    if (inst.hand.frameModel === "chromatic")
+        return open + 1 + position + inst.hand.frameOffsets[finger - 1];
     var scale = keyScale(key);
     var inScale = {};
     for (var i = 0; i < scale.length; i++) inScale[scale[i]] = 1;
@@ -234,7 +237,7 @@ function fingerPitch(stringIdx, position, finger, key, instrument) {
 // they take the solver's key frame.
 function hlFrameBase(stringIdx, position, key, instrument) {
     var inst = resolveInst(instrument);
-    if (position === 1) return inst.tuning[stringIdx] + inst.frameAnchor;
+    if (position === 1) return inst.strings.tuning[stringIdx] + inst.hand.frameAnchor;
     return fingerPitch(stringIdx, position, 1, key, inst);
 }
 
@@ -247,7 +250,7 @@ function hlLabel(stringIdx, finger, position, pitch, key, instrument) {
     var inst = resolveInst(instrument);
     if (finger === 0) return "0";
     var d = pitch - (hlFrameBase(stringIdx, position, key, inst)
-                     + inst.frameOffsets[finger - 1]);
+                     + inst.hand.frameOffsets[finger - 1]);
     var suffix = "";
     for (var i = 0; i < Math.abs(d); i++) suffix += d < 0 ? "L" : "H";
     return "" + finger + suffix;
@@ -255,18 +258,18 @@ function hlLabel(stringIdx, finger, position, pitch, key, instrument) {
 
 function candidatesForPitch(pitch, key, maxPosition, instrument) {
     var inst = resolveInst(instrument);
-    if (maxPosition === undefined) maxPosition = inst.maxPosition;
-    var tun = inst.tuning;
+    if (maxPosition === undefined) maxPosition = inst.hand.maxPosition;
+    var tun = inst.strings.tuning;
     var out = [];
     for (var s = 0; s < tun.length; s++) {
         if (pitch === tun[s]) { out.push([s, 0, 1, 0, pitch]); continue; }
         if (pitch < tun[s]) continue;
-        for (var p = inst.minPosition; p <= maxPosition; p++) {
+        for (var p = inst.hand.minPosition; p <= maxPosition; p++) {
             for (var k = 1; k <= 4; k++) {
                 var nominal = fingerPitch(s, p, k, key, inst);
                 var off = pitch - nominal;
                 if (off === 0) out.push([s, k, p, 0, pitch]);
-                else if (inst.frameModel !== "chromatic" && (off === 1 || off === -1))
+                else if (inst.hand.frameModel !== "chromatic" && (off === 1 || off === -1))
                     out.push([s, k, p, off, pitch]);
             }
         }
@@ -275,21 +278,21 @@ function candidatesForPitch(pitch, key, maxPosition, instrument) {
 }
 
 function posCost(inst, p) {
-    var pc = inst.posCost;
+    var pc = inst.cost.posCost;
     return p < pc.length ? pc[p]
-         : pc[pc.length - 1] + inst.posCostSlope * (p - pc.length + 1);
+         : pc[pc.length - 1] + inst.cost.posCostSlope * (p - pc.length + 1);
 }
 
 // --- chord-aware (multi-note per event) ---------------
 
 function candidatesForEvent(notes, key, maxPosition, instrument) {
     var inst = resolveInst(instrument);
-    if (maxPosition === undefined) maxPosition = inst.maxPosition;
+    if (maxPosition === undefined) maxPosition = inst.hand.maxPosition;
     var perNote = [];
     for (var i = 0; i < notes.length; i++) {
         var cs = candidatesForPitch(notes[i].pitch, key, maxPosition, inst);
         if (notes[i].string != null) {
-            var ms = inst.tuning.length - notes[i].string;
+            var ms = inst.strings.tuning.length - notes[i].string;
             cs = cs.filter(function (c) { return c[0] === ms; });
         }
         if (notes[i].finger != null) {
@@ -308,7 +311,7 @@ function candidatesForEvent(notes, key, maxPosition, instrument) {
         perNote.push(cs);
     }
     var out = [];
-    var posSpan = notes.length >= 3 ? inst.chordPosSpan : inst.chordPosSpanPair;
+    var posSpan = notes.length >= 3 ? inst.cost.chordPosSpan : inst.cost.chordPosSpanPair;
     function recurse(idx, picked, usedStrings, fingeredPositions) {
         if (idx === notes.length) {
             // Simultaneous notes must sit on contiguous strings: a double
@@ -360,20 +363,20 @@ function candidatesForEvent(notes, key, maxPosition, instrument) {
 }
 
 function chordLocalCost(entry, inst) {
-    var top = inst.tuning.length - 1;
+    var top = inst.strings.tuning.length - 1;
     var combo = entry.combo;
     var c = 0.0;
     var positions = [];
     for (var i = 0; i < combo.length; i++) {
         var s = combo[i][0], k = combo[i][1], p = combo[i][2], off = combo[i][3];
-        if (k === 0) c += inst.open[s];
-        if (off !== 0) c += inst.accidental;
-        if (combo[i][5]) c += inst.spell;
+        if (k === 0) c += inst.cost.open[s];
+        if (off !== 0) c += inst.cost.accidental;
+        if (combo[i][5]) c += inst.cost.spell;
         if (k > 0) {
             positions.push(p);
-            c += inst.altLowString * Math.max(0, p - 1) * (top - s);
-            c += inst.fingerCost[k - 1]
-                + inst.fingerHighPos[k - 1] * Math.max(0, p - inst.highPosStart);
+            c += inst.cost.altLowString * Math.max(0, p - 1) * (top - s);
+            c += inst.cost.fingerCost[k - 1]
+                + inst.cost.fingerHighPos[k - 1] * Math.max(0, p - inst.cost.highPosStart);
         }
     }
     // Open-only events have no real hand placement; their pos is virtual.
@@ -386,19 +389,19 @@ function chordLocalCost(entry, inst) {
             if (positions[z] < mn) mn = positions[z];
             if (positions[z] > mx) mx = positions[z];
         }
-        c += inst.posSpread * (mx - mn);
+        c += inst.cost.posSpread * (mx - mn);
     }
     return c;
 }
 
 function chordTransCost(prev, cur, instrument) {
     var inst = resolveInst(instrument);
-    var tun = inst.tuning;
+    var tun = inst.strings.tuning;
     var nStr = tun.length;
     var c = 0.0;
     if (prev.pos !== cur.pos) {
-        var shift = inst.posFixed + inst.posShift * Math.abs(prev.pos - cur.pos);
-        if (prev.openOnly || cur.openOnly) shift *= inst.openShiftDiscount;
+        var shift = inst.cost.posFixed + inst.cost.posShift * Math.abs(prev.pos - cur.pos);
+        if (prev.openOnly || cur.openOnly) shift *= inst.cost.openShiftDiscount;
         c += shift;
     }
     // Bow crossing: gap between the string ranges of the two events.
@@ -414,7 +417,7 @@ function chordTransCost(prev, cur, instrument) {
         if (s2 > mx2) mx2 = s2;
     }
     var gap = Math.max(0, mn2 - mx1, mn1 - mx2);
-    c += inst.cross[Math.min(gap, inst.cross.length - 1)];
+    c += inst.cost.cross[Math.min(gap, inst.cost.cross.length - 1)];
     // Melodic finger continuity (single-note events only). Only within a
     // position: once the hand shifts, finger spacing and offsets are
     // relative to a new frame and the shift cost already covers the move.
@@ -426,15 +429,15 @@ function chordTransCost(prev, cur, instrument) {
             // regardless of how the key frame labels the two notes.
             var barre = Math.abs(a[0] - b[0]) === 1
                 && a[4] - tun[a[0]] === b[4] - tun[b[0]];
-            c += barre ? inst.barre : inst.sameFingerCross;
+            c += barre ? inst.cost.barre : inst.cost.sameFingerCross;
         } else if (a[0] === b[0] && a[1] > 0 && b[1] > 0 && a[1] !== b[1]) {
             // Dropping/lifting to another finger in frame is free;
             // only reaching beyond the frame costs.
             var stretch = Math.abs(a[4] - b[4])
-                - inst.stretchPerFinger * Math.abs(a[1] - b[1]);
-            if (stretch > 0) c += inst.stretch * stretch;
+                - inst.cost.stretchPerFinger * Math.abs(a[1] - b[1]);
+            if (stretch > 0) c += inst.cost.stretch * stretch;
         } else if (a[0] === b[0] && a[1] > 0 && a[1] === b[1] && a[3] !== b[3]) {
-            c += inst.semitoneSlide;
+            c += inst.cost.semitoneSlide;
         }
     }
     return c;
