@@ -833,7 +833,7 @@ MuseScore {
             TextEdit {
                 id: statusText
                 width: parent.width
-                text: "Ready."
+                text: "v" + plugin.version
                 wrapMode: TextEdit.Wrap
                 readOnly: true
                 selectByMouse: true
