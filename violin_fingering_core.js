@@ -181,13 +181,14 @@ function detectInstrument(id) {
     return "";
 }
 
-var SHARP_ORDER = [6, 1, 8, 3, 10, 5, 0];   // F# C# G# D# A# E# B# (mod 12)
-var FLAT_ORDER  = [10, 3, 8, 1, 6, 11, 4];  // Bb Eb Ab Db Gb Cb Fb
-
+// Position labels, indexed by position. "\u00bd" is ½: half position (cello).
 var ROMAN = ["\u00bd", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X",
              "XI", "XII", "XIII", "XIV", "XV", "XVI", "XVII", "XVIII", "XIX", "XX"];
 
+// Scale tones (pitch classes) of a key; key = signature count, + sharps / - flats.
 function keyScale(key) {
+    var SHARP_ORDER = [6, 1, 8, 3, 10, 5, 0];   // F# C# G# D# A# E# B# (mod 12)
+    var FLAT_ORDER  = [10, 3, 8, 1, 6, 11, 4];  // Bb Eb Ab Db Gb Cb Fb
     var s = {0:1, 2:1, 4:1, 5:1, 7:1, 9:1, 11:1};   // C major
     if (key > 0) {
         for (var i = 0; i < key; i++) {
