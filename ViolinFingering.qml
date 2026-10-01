@@ -21,7 +21,6 @@ MuseScore {
     version: "1.5.0"
     title: "ViolinFingering"
     description: "Violin fingering (string/finger/position) by dynamic programming. Reads key signature; writes finger numbers and Roman-numeral position marks."
-    categoryCode: "composing-arranging-tools"
     pluginType: "dialog"
     width: 420
     height: 530

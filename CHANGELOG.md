@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The plugin sits at the top level of the Plugins menu (no category), so it
+  is one click away instead of under Composing/arranging tools.
 - Selection wins: a range selection decides the staff (its first) and the
   tick range; the Staff dropdown shows only with no selection. A summary
   line names the target.
