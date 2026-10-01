@@ -485,3 +485,20 @@ test('thumb: an easy low passage never uses it with the default threshold', func
     const res = core.solveChords(melody([36, 38, 40, 41, 43, 45, 47, 48]), 0, 20, 'cello');
     res.forEach(function (r) { assert.notStrictEqual(r.combo[0][FING], core.THUMB); });
 });
+
+test('cello: Bach G major prelude bar 1 uses the open strings in first position', function () {
+    // The first two bars (G2 D3 B3 A3 B3 D3 B3 D3 ... then the second bar
+    // over a C-E-C-B-C-E-C-E): G open, D open, B finger 1 on the A string,
+    // A open in I, not a fingered shape up in V. Needs the following bar as
+    // context; alone, a single bar has nothing pulling the hand home.
+    const ps = [43, 50, 59, 57, 59, 50, 59, 50, 43, 50, 59, 57, 59, 50, 59, 50,
+                43, 52, 60, 59, 60, 52, 60, 52, 43, 52, 60, 59, 60, 52, 60, 52];
+    const res = core.solveChords(melody(ps), 1, 20, 'cello');
+    assert.ok(res);
+    const want = {43: [1, 0], 50: [2, 0], 57: [3, 0], 59: [3, 1]};   // pitch -> [string idx, finger]
+    for (let i = 0; i < 16; i++) {
+        const c = res[i].combo[0];
+        assert.deepStrictEqual([c[STR], c[FING]], want[ps[i]], 'note ' + i + ' (' + ps[i] + ')');
+        assert.strictEqual(res[i].pos, 1, 'note ' + i + ' position');
+    }
+});

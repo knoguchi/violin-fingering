@@ -165,7 +165,11 @@ var INSTRUMENTS = {
                 posShift: 1.0,
                 posFixed: 2.0,
                 stretchPerFinger: 1,
-                open: [0.15, 0.2, 0.3, 0.45],
+                // Open strings are idiomatic on the cello (Bach's G major
+                // prelude arpeggiates them), so they cost little: with the
+                // violin-like values it fingered bar 1 in V instead of
+                // G D open, B 1, A open in I.
+                open: [0.08, 0.1, 0.15, 0.22],
                 posCost: [0, 0, 0.08, 0.08, 0.06, 0.06, 0.1, 0.1, 0.12, 0.14, 0.16, 0.18, 0.2],
                 posCostSlope: 0.08,
                 altLowString: 0.015,

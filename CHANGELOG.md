@@ -12,7 +12,9 @@
   take an instrument name/config instead of a bare tuning. Violin and
   viola output is unchanged (golden snapshot test).
 - Cello (first cut): chromatic hand frame incl. half position, cello
-  weights favoring fingers 1-2 high up the neck.
+  weights favoring fingers 1-2 high up the neck. Open strings cost little (they
+  are idiomatic on the cello): Bach's G major prelude now starts G D open,
+  B 1, A open in position I instead of a fingered shape in V.
 - Cello thumb position: the thumb is finger 5. MuseScore stores the
   thumb-position sign as an articulation on the chord, so the plugin writes
   and reads that (one per chord; a hand-placed sign pins the chord's lowest
