@@ -27,7 +27,7 @@ MuseScore {
 
     onRun: {
         if (!curScore) {
-            statusText.text = "No score is open";
+            statusBody = "No score is open";
             return;
         }
         staffModel = buildStaffModel();
@@ -95,6 +95,9 @@ MuseScore {
     property string activeInstrument: "violin"
     readonly property var activeInst: Core.INSTRUMENTS[activeInstrument]
     property var prefs: null
+    // Result or error shown under the version line in the status area, so a
+    // copied status always carries the version (for issue reports).
+    property string statusBody: ""
 
     // Every instrument in Core.INSTRUMENTS gets a radio button; the ones
     // flagged experimental are marked in red when selected.
@@ -497,7 +500,7 @@ MuseScore {
     // score) and updates the registry. Manual annotations are untouched
     // unless "Replace manual fingerings too" is checked.
     function clearAnnotations() {
-        if (!curScore) { statusText.text = "No score is open"; return; }
+        if (!curScore) { statusBody = "No score is open"; return; }
         collectEvents();   // classifies annotations into pluginEls/promotedEls
         curScore.startCmd();
         for (var pr = 0; pr < promotedEls.length; pr++) {
@@ -512,7 +515,7 @@ MuseScore {
             if (!registry.consumed[q]) items.push(registry.items[q]);
         curScore.setMetaTag("violinFingering", JSON.stringify({v: 2, items: items}));
         curScore.endCmd();
-        statusText.text = "Cleared " + removed + " plugin annotation" + (removed === 1 ? "" : "s")
+        statusBody = "Cleared " + removed + " plugin annotation" + (removed === 1 ? "" : "s")
             + (items.length ? " (" + items.length + " outside the selection kept)" : "");
     }
 
@@ -648,7 +651,7 @@ MuseScore {
         // The radio selection is authoritative (readAnnotations checks
         // open-string pitches against its tuning).
         var events = collectEvents();
-        if (events.length === 0) { statusText.text = "No notes found"; return; }
+        if (events.length === 0) { statusBody = "No notes found"; return; }
         var key = readKeySignature();
         // Build chord events. Events with any harmonic note become segment
         // boundaries: solved independently from neighboring segments because
@@ -709,14 +712,14 @@ MuseScore {
                 for (var bj = 0; bj < events[bi].pitches.length && bad.length < 10; bj++)
                     if (Core.candidatesForPitch(events[bi].pitches[bj].midi, key, undefined, activeInst).length === 0)
                         bad.push(noteName(events[bi].pitches[bj].midi) + " at tick " + events[bi].tick);
-            statusText.text = "ViolinFingering could not solve this staff (some notes outside "
+            statusBody = "ViolinFingering could not solve this staff (some notes outside "
                 + activeInstrument + " range).\n"
                 + (bad.length ? "Unplayable: " + bad.join(", ") + "\n" : "")
                 + "Report issues at https://github.com/knoguchi/violin-fingering/issues";
             return;
         }
         var stats = writeAnnotations(events, result, key);
-        statusText.text = "Done: " + events.length + " notes, "
+        statusBody = "Done: " + events.length + " notes, "
             + (key > 0 ? key + " sharps" : key < 0 ? (-key) + " flats" : "no accidentals") + "\n"
             + (thumbProblem ? "Thumb sign not written: " + thumbProblem + "\n" : "")
             + "Fingers " + stats.fing
@@ -807,10 +810,10 @@ MuseScore {
             Button {
                 text: "Run"
                 onClicked: {
-                    statusText.text = "Running...";
+                    statusBody = "Running...";
                     plugin.refreshTarget();
                     try { plugin.apply(); }
-                    catch (e) { statusText.text = "Exception while running: " + e + "\n" + (e.stack || "")
+                    catch (e) { statusBody = "Exception while running: " + e + "\n" + (e.stack || "")
                         + "\nPlease report: https://github.com/knoguchi/violin-fingering/issues"; }
                 }
             }
@@ -819,7 +822,7 @@ MuseScore {
                 onClicked: {
                     plugin.refreshTarget();
                     try { plugin.clearAnnotations(); }
-                    catch (e) { statusText.text = "Exception while clearing: " + e + "\n" + (e.stack || "")
+                    catch (e) { statusBody = "Exception while clearing: " + e + "\n" + (e.stack || "")
                         + "\nPlease report: https://github.com/knoguchi/violin-fingering/issues"; }
                 }
             }
@@ -833,7 +836,7 @@ MuseScore {
             TextEdit {
                 id: statusText
                 width: parent.width
-                text: "v" + plugin.version
+                text: "v" + plugin.version + (plugin.statusBody ? "\n" + plugin.statusBody : "")
                 wrapMode: TextEdit.Wrap
                 readOnly: true
                 selectByMouse: true
