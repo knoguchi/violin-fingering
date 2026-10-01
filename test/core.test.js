@@ -751,3 +751,21 @@ test('cello: E melodic minor agrees with the teacher on the opening and the last
         });
     }
 });
+
+// D melodic minor (ascending), D2 to E4, as played by Kenji's cello teacher (relayed by
+// Kenji, taken as standard): 1 3 4 | 0 1 2 4 | 0 1 2 4 | 0 1 3 4 2. B2 is the open hand; for
+// the last two notes the teacher stays in I (D4 with 4) and shifts for E4, where the plugin
+// shifts first.
+test('cello: D melodic minor agrees with the teacher except B2 and the last two notes', function () {
+    const ps   = [38, 40, 41, 43, 45, 47, 49, 50, 52, 53, 55, 57, 59, 61, 62, 64];
+    const want = [1, 3, 4, 0, 1, 2, 4, 0, 1, 2, 4, 0, 1, 3, 4, 2];
+    const skip = [5, 14, 15];
+    for (const key of [-1, 0, 3]) {                                   // key signature must not matter
+        const res = core.solveChords(melody(ps), key, 20, 'cello');
+        assert.ok(res);
+        res.forEach(function (r, i) {
+            if (skip.indexOf(i) >= 0) return;
+            assert.strictEqual(r.combo[0][FING], want[i], 'finger of note ' + i + ', key ' + key);
+        });
+    }
+});
