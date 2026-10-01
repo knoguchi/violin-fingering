@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Fix (cello): the major or minor key map was chosen from the whole piece, so a major
+  piece that touches its relative minor (the Bach prelude has a D#) used the minor map
+  throughout and opened in IV. The mode is now read from the notes around each event.
+
 ## 1.6.0-rc2 (2026-10-01)
 
 - Cello key map: for each key signature (major and melodic minor, the mode read from

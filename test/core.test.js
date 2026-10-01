@@ -563,3 +563,29 @@ test('cello: Bach prelude bars 5-10 agree with the teacher on at least 52 of 73 
     assert.strictEqual(n, 73);
     assert.ok(ok >= 52, 'matched ' + ok + ' of ' + n);
 });
+
+test('cello: the mode is read locally, not over the whole piece', function () {
+    // G major tones with one D# (the raised seventh of E minor) far from the start.
+    const scale = [43, 45, 47, 48, 50, 52, 54, 55];
+    let ps = [];
+    for (let i = 0; i < 6; i++) ps = ps.concat(scale);
+    ps.push(51);
+    const modes = core.keyModes(melody(ps), 1);
+    assert.strictEqual(modes[0], 'maj');
+    assert.strictEqual(modes[30], 'maj');
+    assert.strictEqual(modes[ps.length - 1], 'min');
+});
+
+test('cello: Bach prelude opens G D open, B 1, A open in I, although it visits E minor', function () {
+    // Reading the mode over the whole piece applied E minor's key map from note 1 and
+    // began the prelude in IV on the wrong strings.
+    const ps = require('./bach_prelude_pitches.json').pitches;
+    const res = core.solveChords(melody(ps), 1, 20, 'cello');
+    assert.ok(res);
+    const want = {43: [1, 0], 50: [2, 0], 57: [3, 0], 59: [3, 1]};   // pitch -> [string, finger]
+    for (let i = 0; i < 16; i++) {
+        const c = res[i].combo[0];
+        assert.deepStrictEqual([c[STR], c[FING]], want[ps[i]], 'note ' + i);
+        assert.strictEqual(res[i].pos, 1, 'position of note ' + i);
+    }
+});

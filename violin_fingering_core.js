@@ -523,19 +523,21 @@ function posCost(inst, p) {
 
 // --- chord-aware (multi-note per event) ---------------
 
-// Mode of each key signature in use, read from the notes: a melodic minor has the
-// raised seventh of the relative minor, a pitch class outside the major scale.
+// Mode (maj / min = melodic minor) at each event, read from the notes around it: a melodic
+// minor has the raised seventh of the relative minor, a pitch class outside the major scale.
+// Local on purpose: a major piece that visits its relative minor for a bar is still major
+// elsewhere. KEY_MODE_WINDOW is how many events each side to look at.
+var KEY_MODE_WINDOW = 8;
 function keyModes(events, key) {
-    var modes = {}, seen = {};
+    var modes = [];
     for (var i = 0; i < events.length; i++) {
         var k = events[i].key != null ? events[i].key : key;
-        seen[k] = seen[k] || {};
-        for (var j = 0; j < events[i].pitches.length; j++)
-            seen[k][events[i].pitches[j].pitch % 12] = 1;
-    }
-    for (var kk in seen) {
-        var tonic = (((+kk * 7) % 12) + 12) % 12;          // major tonic of the signature
-        modes[kk] = seen[kk][(tonic + 8) % 12] ? "min" : "maj";
+        var raised7 = ((((k * 7) % 12) + 12) % 12 + 8) % 12;   // relative minor's raised 7th
+        var minor = false;
+        for (var j = Math.max(0, i - KEY_MODE_WINDOW); j <= Math.min(events.length - 1, i + KEY_MODE_WINDOW) && !minor; j++)
+            for (var q = 0; q < events[j].pitches.length; q++)
+                if (events[j].pitches[q].pitch % 12 === raised7) { minor = true; break; }
+        modes.push(minor ? "min" : "maj");
     }
     return modes;
 }
@@ -758,7 +760,7 @@ function solveChords(events, key, maxPosition, instrument) {
     var start = 0;
     for (var i = 1; i <= events.length; i++) {
         if (i < events.length && !eventHasPin(events[i])) continue;
-        var seg = solveSegWithThumb(events.slice(start, i), key, maxPosition, inst, modes);
+        var seg = solveSegWithThumb(events.slice(start, i), key, maxPosition, inst, modes && modes.slice(start, i));
         if (!seg) return null;
         out = out.concat(seg);
         start = i;
@@ -829,7 +831,7 @@ function solveChordSeg(events, key, maxPosition, instrument, allowThumb, modes) 
     var layers = [];
     for (var i = 0; i < events.length; i++) {
         var evKey = events[i].key != null ? events[i].key : key;
-        var combos = candidatesForEvent(events[i].pitches, evKey, maxPosition, inst, modes && modes[evKey]);
+        var combos = candidatesForEvent(events[i].pitches, evKey, maxPosition, inst, modes && modes[i]);
         if (allowThumb && !allowThumb[i]) combos = combos.filter(noThumb);
         if (!combos.length) return null;
         layers.push(combos);
