@@ -3,3 +3,7 @@
 *.mscz
 *.musicxml
 node_modules/
+.mscbackup/
+*.swp
+*.swo
+*~
