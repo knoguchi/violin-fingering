@@ -33,9 +33,13 @@ Annotated by the plugin:
 
 ## Cello (experimental)
 Cello support is new and was written without a cellist: the hand model, the
-cost weights and the use of the thumb are starting values, checked only
-against one piece (about 60% agreement with a human fingering of Bach's
-G major prelude). The dialog marks it "experimental" in red. If you play the
+cost weights and the use of the thumb are starting values. They have been
+compared with a cellist's scale fingerings (two octaves, major and melodic
+minor), where the notes near first position agree and the far keys follow a
+memorized pattern the solver does not reproduce, and with 86 hand-placed
+fingerings in one Bach prelude score (about 60% the same finger; those marks
+are sparse and of unknown origin, so this is not a measure of accuracy). The
+dialog marks it "experimental" in red. If you play the
 cello, reports of what looks wrong are very welcome; a photo of a few bars
 with your own fingering is just as useful. See the issues link above.
 
