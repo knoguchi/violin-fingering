@@ -11,7 +11,16 @@
   take an instrument name/config instead of a bare tuning. Violin and
   viola output is unchanged (golden snapshot test).
 - Cello (first cut): chromatic hand frame incl. half position, cello
-  weights favoring fingers 1-2 high up the neck. No thumb position yet.
+  weights favoring fingers 1-2 high up the neck.
+- Cello thumb position: the thumb is finger 5. MuseScore stores the
+  thumb-position sign as an articulation on the chord, so the plugin writes
+  and reads that (one per chord; a hand-placed sign pins the chord's lowest
+  note to the thumb; Clear removes the plugin's own). Thumb offset, entry position and cost
+  are placeholders to tune against real cello fingerings.
+- Annotation recognition (Clear, re-run, manual constraints) is now built
+  from the config: position marks up to XX and the half mark, string
+  marks up to the largest string count (fixes cello positions above VIII
+  and the 5-string violin's fifth string being left behind).
 - Instrument radio buttons, pre-selected from the part and remembered
   between runs. String-number key follows the instrument.
 - Cello and a 5-string violin (C-G-D-A-E) are experimental: hidden unless

@@ -360,9 +360,10 @@ test('INSTRUMENTS: per-string and per-finger arrays match the config', function 
         assert.strictEqual(inst.strings.names.length, n, name + ' strings.names');
         assert.strictEqual(inst.strings.labels.length, n, name + ' strings.labels');
         assert.strictEqual(inst.cost.open.length, n, name + ' cost.open');
+        const nFing = inst.hand.thumb ? 5 : 4;   // 4 fingers, plus the thumb
         assert.strictEqual(inst.hand.frameOffsets.length, 4, name + ' hand.frameOffsets');
-        assert.strictEqual(inst.cost.fingerCost.length, 4, name + ' cost.fingerCost');
-        assert.strictEqual(inst.cost.fingerHighPos.length, 4, name + ' cost.fingerHighPos');
+        assert.strictEqual(inst.cost.fingerCost.length, nFing, name + ' cost.fingerCost');
+        assert.strictEqual(inst.cost.fingerHighPos.length, nFing, name + ' cost.fingerHighPos');
         assert.ok(inst.hand.minPosition <= inst.hand.maxPosition, name + ' position range');
     });
 });
@@ -390,4 +391,76 @@ test('violin5: open E is a candidate and costs are finite', function () {
     assert.ok(res);
     assert.strictEqual(res[0].combo[0][STR], 4);
     assert.strictEqual(res[0].combo[0][FING], 0);
+});
+
+// --- thumb (cello) and annotation vocabulary ---
+
+test('thumb: only the cello has one; finger 5 is the thumb', function () {
+    assert.ok(core.INSTRUMENTS.cello.hand.thumb);
+    assert.ok(!core.INSTRUMENTS.violin.hand.thumb);
+    assert.ok(!core.INSTRUMENTS.viola.hand.thumb);
+    assert.strictEqual(core.fingerFromText('T'), -1);                 // a letter is not a thumb
+    assert.strictEqual(core.fingerFromText('3'), 3);
+    assert.strictEqual(core.fingerFromText('<b>3</b>'), 3);
+    assert.strictEqual(core.fingerFromText('II'), -1);
+});
+
+test('thumb: pitch sits thumb.offset below finger 1 of the same position', function () {
+    const th = core.INSTRUMENTS.cello.hand.thumb;
+    for (const pos of [th.minPosition, th.minPosition + 3])
+        assert.strictEqual(core.fingerPitch(3, pos, core.THUMB, 0, 'cello'),
+                           core.fingerPitch(3, pos, 1, 0, 'cello') + th.offset);
+});
+
+test('thumb: candidates only from minPosition, never on violin/viola', function () {
+    const th = core.INSTRUMENTS.cello.hand.thumb;
+    const cands = core.candidatesForPitch(70, 0, 20, 'cello')
+        .filter(function (c) { return c[1] === core.THUMB; });
+    assert.ok(cands.length > 0);
+    cands.forEach(function (c) { assert.ok(c[2] >= th.minPosition); });
+    ['violin', 'viola'].forEach(function (n) {
+        core.candidatesForPitch(79, 0, 7, n).forEach(function (c) {
+            assert.ok(c[1] <= 4, n);
+        });
+    });
+});
+
+test('thumb: a pinned thumb is honored', function () {
+    const th = core.INSTRUMENTS.cello.hand.thumb;
+    const res = core.solveChords(melody([{pitch: 70, finger: core.THUMB}]), 0, 20, 'cello');
+    assert.ok(res);
+    assert.strictEqual(res[0].combo[0][FING], core.THUMB);
+    assert.ok(res[0].combo[0][POS] >= th.minPosition);
+    const c = res[0].combo[0];
+    assert.strictEqual(core.hlLabel(c[STR], c[FING], c[POS], c[4], 0, 'cello'),
+                       core.THUMB_KEY);
+});
+
+test('thumb: same-pitch thumb on adjacent strings is a barre (cheap), not a crossing', function () {
+    // thumb at one spot across A and D (a perfect fifth): pitches 70 (A) and 63 (D)
+    const t = core.THUMB;
+    const posA = 14, posD = 14;
+    const a = {combo: [[3, t, posA, 0, core.fingerPitch(3, posA, t, 0, 'cello')]], pos: posA, openOnly: false};
+    const b = {combo: [[2, t, posD, 0, core.fingerPitch(2, posD, t, 0, 'cello')]], pos: posD, openOnly: false};
+    const cost = core.chordTransCost(a, b, 'cello');
+    const inst = core.INSTRUMENTS.cello.cost;
+    assert.ok(cost < inst.sameFingerCross, 'barre cost ' + cost);
+});
+
+test('annotation vocabulary: string labels, position marks, string counts', function () {
+    assert.strictEqual(core.stringFromLabel('③'), 3);
+    assert.strictEqual(core.stringFromLabel('⑤'), 5);   // 5-string violin
+    assert.strictEqual(core.stringFromLabel('A'), 0);
+    assert.strictEqual(core.maxStrings(), 5);
+    ['\u00bd', 'I', 'VIII', 'IX', 'XX'].forEach(function (m) {
+        assert.ok(core.isPositionMark(m), m);
+    });
+    assert.ok(!core.isPositionMark('XXI'));
+    assert.ok(!core.isPositionMark('T'));
+});
+
+test('thumb: articulation recognised by symbol id or subtype name', function () {
+    assert.ok(core.isThumbArticulation(core.THUMB_SYMID, undefined));
+    assert.ok(core.isThumbArticulation(-1, 'Thumb position'));
+    assert.ok(!core.isThumbArticulation(1234, 'Staccato'));
 });

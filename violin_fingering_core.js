@@ -148,7 +148,11 @@ var INSTRUMENTS = {
             frameAnchor: 2,
             hlEnabled: false,
             minPosition: 0,         // half position: finger 1 a semitone above the open string
-            maxPosition: 20
+            maxPosition: 20,
+            // Thumb (finger 5, the thumb-position sign): a fifth hand slot lying across the
+            // strings, offset semitones from finger 1 of the same position,
+            // usable from minPosition up. Placeholder values, to be tuned.
+            thumb: {offset: -2, minPosition: 12}
         },
         cost: withDefaults({
                 // One position step is a semitone: shifts are cheaper per step, the
@@ -166,8 +170,9 @@ var INSTRUMENTS = {
                 chordPosSpanPair: 4,
                 // Fourth finger is rarely used in the lower positions and almost
                 // never up the neck; third thins out too (1/2 dominate high up).
-                fingerCost: [0, 0, 0.05, 0.2],
-                fingerHighPos: [0, 0, 0.1, 0.3],
+                // The 5th entry is the thumb.
+                fingerCost: [0, 0, 0.05, 0.2, 0.3],
+                fingerHighPos: [0, 0, 0.1, 0.3, 0],
                 highPosStart: 9
         })
     },
@@ -237,11 +242,68 @@ function keyScale(key) {
     return out.sort(function (a, b) { return a - b; });
 }
 
+// Finger 5 is the thumb (cello). MuseScore stores the thumb-position sign
+// as an Articulation on the chord (not a Fingering on a note): SMuFL symbol
+// stringsThumbPosition, plugin-API SymId 2673 in MuseScore 4.7 (subtype
+// name "Thumb position"). The id is matched together with the name, since
+// the numeric SymId can shift between MuseScore versions.
+var THUMB = 5;
+var THUMB_SYMID = 2673;
+var THUMB_SUBTYPE_NAME = "Thumb position";
+// Registry key of a plugin-written thumb mark (it is chord-level, so its
+// "pitch" slot holds THUMB_PITCH).
+var THUMB_KEY = "T";
+var THUMB_PITCH = -2;
+
+function isThumbArticulation(symbol, subtypeName) {
+    return symbol === THUMB_SYMID || subtypeName === THUMB_SUBTYPE_NAME;
+}
+
+// Semitone offset of a finger within the hand frame (thumb included).
+function handOffset(inst, finger) {
+    return finger === THUMB ? inst.hand.thumb.offset : inst.hand.frameOffsets[finger - 1];
+}
+
+// --- annotation vocabulary -----------------------------
+// What the plugin writes and has to recognise again (Clear, re-run,
+// manual constraints). Derived from the config so a new instrument or
+// position can't be missed.
+
+// Finger number of a fingering text ("3" -> 3, markup ignored), or -1.
+// The thumb is not a text: see isThumbArticulation.
+function fingerFromText(raw) {
+    var txt = ("" + raw).replace(/<[^>]*>/g, "").trim();
+    return /^[0-9]$/.test(txt) ? parseInt(txt, 10) : -1;
+}
+
+// String number of a circled mark ("③" -> 3), or 0 if it is not one.
+function stringFromLabel(txt) {
+    for (var n in INSTRUMENTS) {
+        var i = INSTRUMENTS[n].strings.labels.indexOf(txt);
+        if (i >= 0) return i + 1;
+    }
+    return 0;
+}
+
+// Largest string count of any instrument (bound for string-number marks).
+function maxStrings() {
+    var m = 0;
+    for (var n in INSTRUMENTS)
+        m = Math.max(m, INSTRUMENTS[n].strings.tuning.length);
+    return m;
+}
+
+// True for a position mark the plugin writes ("\u00bd", "I" ... "XX").
+function isPositionMark(txt) {
+    return ROMAN.indexOf(txt) >= 0;
+}
+
 function fingerPitch(stringIdx, position, finger, key, instrument) {
     var inst = resolveInst(instrument);
     var open = inst.strings.tuning[stringIdx];
     if (inst.hand.frameModel === "chromatic")
-        return open + 1 + position + inst.hand.frameOffsets[finger - 1];
+        return open + 1 + position + (finger === THUMB
+            ? inst.hand.thumb.offset : inst.hand.frameOffsets[finger - 1]);
     var scale = keyScale(key);
     var inScale = {};
     for (var i = 0; i < scale.length; i++) inScale[scale[i]] = 1;
@@ -281,6 +343,7 @@ function hlFrameBase(stringIdx, position, key, instrument) {
 function hlLabel(stringIdx, finger, position, pitch, key, instrument) {
     var inst = resolveInst(instrument);
     if (finger === 0) return "0";
+    if (finger === THUMB) return THUMB_KEY;
     var d = pitch - (hlFrameBase(stringIdx, position, key, inst)
                      + inst.hand.frameOffsets[finger - 1]);
     var suffix = "";
@@ -297,7 +360,8 @@ function candidatesForPitch(pitch, key, maxPosition, instrument) {
         if (pitch === tun[s]) { out.push([s, 0, 1, 0, pitch]); continue; }
         if (pitch < tun[s]) continue;
         for (var p = inst.hand.minPosition; p <= maxPosition; p++) {
-            for (var k = 1; k <= 4; k++) {
+            for (var k = 1; k <= (inst.hand.thumb ? THUMB : 4); k++) {
+                if (k === THUMB && p < inst.hand.thumb.minPosition) continue;
                 var nominal = fingerPitch(s, p, k, key, inst);
                 var off = pitch - nominal;
                 if (off === 0) out.push([s, k, p, 0, pitch]);
@@ -465,8 +529,12 @@ function chordTransCost(prev, cur, instrument) {
         } else if (a[0] === b[0] && a[1] > 0 && b[1] > 0 && a[1] !== b[1]) {
             // Dropping/lifting to another finger in frame is free;
             // only reaching beyond the frame costs.
-            var stretch = Math.abs(a[4] - b[4])
-                - inst.cost.stretchPerFinger * Math.abs(a[1] - b[1]);
+            // The thumb sits below finger 1 by its own frame offset, not
+            // one finger step away.
+            var reach = (a[1] === THUMB || b[1] === THUMB)
+                ? Math.abs(handOffset(inst, a[1]) - handOffset(inst, b[1]))
+                : inst.cost.stretchPerFinger * Math.abs(a[1] - b[1]);
+            var stretch = Math.abs(a[4] - b[4]) - reach;
             if (stretch > 0) c += inst.cost.stretch * stretch;
         } else if (a[0] === b[0] && a[1] > 0 && a[1] === b[1] && a[3] !== b[3]) {
             c += inst.cost.semitoneSlide;

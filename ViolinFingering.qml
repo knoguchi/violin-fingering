@@ -307,7 +307,7 @@ MuseScore {
                         if (!a || a.type !== Element.STAFF_TEXT) continue;
                         if (a.track !== undefined && Math.floor(a.track / 4) !== staffIdx) continue;
                         var ptxt = ("" + a.text).replace(/<[^>]*>/g, "").trim();
-                        if (!/^(I|II|III|IV|V|VI|VII|VIII)$/.test(ptxt)) continue;
+                        if (!Core.isPositionMark(ptxt)) continue;
                         if (classifyAnnotation(registry, a, cursor.tick, -1, "p", ptxt) === "plugin")
                             pluginEls.push(a);
                     }
@@ -339,6 +339,10 @@ MuseScore {
                     }
                     for (var i = 0; i < el.notes.length; i++)
                         collectNote(byTick, el.notes[i], cursor.tick, false);
+                    var thumbPin = readChordThumb(el, cursor.tick);
+                    if (thumbPin >= 0 && byTick[cursor.tick] && byTick[cursor.tick][thumbPin]
+                            && byTick[cursor.tick][thumbPin].finger === null)
+                        byTick[cursor.tick][thumbPin].finger = Core.THUMB;
                 }
                 cursor.next();
             }
@@ -354,6 +358,45 @@ MuseScore {
                          grace: pitches[0].grace || false});
         }
         return events;
+    }
+
+    // The thumb-position sign is an Articulation on the chord, not text on a
+    // note. Returns the chord's thumb articulations ([] when none or when the
+    // API does not expose them).
+    function chordThumbs(chord) {
+        var out = [];
+        try {
+            var arts = chord.articulations;
+            for (var i = 0; i < arts.length; i++) {
+                var nm = "";
+                try { nm = arts[i].subtypeName(); } catch (e0) {}
+                if (Core.isThumbArticulation(arts[i].symbol, nm)) out.push(arts[i]);
+            }
+        } catch (e) {}
+        return out;
+    }
+
+    // Thumb marks of one chord, sorted: plugin-owned ones are queued for
+    // removal; a hand-made one pins the chord's lowest note to the thumb
+    // (the thumb stops the lowest string, fingers play above it) unless
+    // "replace manual fingerings" is on. Returns the pitch to pin, or -1.
+    function readChordThumb(chord, tick) {
+        var pin = -1;
+        if (!activeInst.hand.thumb) return pin;
+        var thumbs = chordThumbs(chord);
+        for (var i = 0; i < thumbs.length; i++) {
+            var cls = classifyAnnotation(registry, thumbs[i], tick, Core.THUMB_PITCH,
+                                         "f", Core.THUMB_KEY);
+            if (cls === "plugin" || overwrite.checked) {
+                pluginEls.push(thumbs[i]);
+                continue;
+            }
+            var lowest = 1000;
+            for (var n = 0; n < chord.notes.length; n++)
+                if (chord.notes[n].pitch < lowest) lowest = chord.notes[n].pitch;
+            pin = lowest;
+        }
+        return pin;
     }
 
     function collectNote(byTick, note, t, grace) {
@@ -405,6 +448,7 @@ MuseScore {
             var el = note.elements[i];
             if (el.type !== Element.FINGERING) continue;
             var txt = ("" + el.text).replace(/<[^>]*>/g, "").trim();
+            var fnum = Core.fingerFromText(txt);          // a digit, or -1
             var isString = false;
             try {
                 if (el.subStyle !== undefined && typeof Tid !== "undefined" &&
@@ -413,9 +457,10 @@ MuseScore {
             } catch (e) {}
             var kind;
             var hl = !isString && /^[0-4][LH]+$/.test(txt);
-            if (/^[0-9]$/.test(txt)) kind = isString ? "s" : "f";
+            var snum = Core.stringFromLabel(txt);         // circled string number
+            if (fnum >= 0) kind = isString ? "s" : "f";
             else if (hl) kind = "f";
-            else if (/^[①-④]$/.test(txt)) kind = "s";  // circled string number
+            else if (snum > 0) kind = "s";
             else if (/^(I|II|III|IV)$/.test(txt)) kind = "s";    // legacy plugin string mark
             else continue;
             if (classifyAnnotation(registry, el, tick, note.pitch, kind, txt) === "plugin") {
@@ -423,13 +468,13 @@ MuseScore {
                 continue;
             }
             humanEls.push(el);
-            if (/^[①-④]$/.test(txt)) {
-                out.string = txt.charCodeAt(0) - 0x2460 + 1;
+            if (snum > 0) {
+                out.string = snum;
                 continue;
             }
-            if (!/^[0-9]$/.test(txt) && !hl) continue;   // human Roman text: no constraint
-            var v = parseInt(txt);
-            if (kind === "s" && v >= 1 && v <= 4) out.string = v;
+            if (fnum < 0 && !hl) continue;   // human Roman text: no constraint
+            var v = fnum >= 0 ? fnum : parseInt(txt);
+            if (kind === "s" && v >= 1 && v <= Core.maxStrings()) out.string = v;
             else if (kind === "f") plainDigits.push(v);
         }
         var hasZero = plainDigits.indexOf(0) >= 0;
@@ -497,8 +542,35 @@ MuseScore {
             + (items.length ? " (" + items.length + " outside the selection kept)" : "");
     }
 
+    // Adds the thumb-position sign (an Articulation) to the chord of `note`
+    // and checks it took. Returns true on success; otherwise tells the user.
+    function writeThumb(note, color) {
+        try {
+            var chord = note.parent;
+            var before = chord.articulations.length;
+            var art = newElement(Element.ARTICULATION);
+            art.symbol = Core.THUMB_SYMID;
+            art.color = color;
+            chord.add(art);
+            var arts = chord.articulations;
+            var added = arts.length === before + 1;
+            if (added) {
+                var nm = "";
+                try { nm = arts[arts.length - 1].subtypeName(); } catch (e0) {}
+                added = Core.isThumbArticulation(arts[arts.length - 1].symbol, nm);
+            }
+            if (!added) throw "the sign was not added";
+            return true;
+        } catch (e) {
+            thumbProblem = "" + e;
+            return false;
+        }
+    }
+    property string thumbProblem: ""
+
     // -- write fingering annotations ---------------------
     function writeAnnotations(events, result, key) {
+        thumbProblem = "";
         curScore.startCmd();
         // annotations the user edited are theirs now: recolor to black
         for (var pr = 0; pr < promotedEls.length; pr++) {
@@ -518,6 +590,7 @@ MuseScore {
             var st = result[i];
             if (!st || st.harmonic) { nSkip++; continue; }
             var combo = st.combo, handPos = st.pos;
+            var thumbWritten = false;
             // Write finger and string number for EACH note in the chord
             for (var j = 0; j < combo.length; j++) {
                 var s = combo[j][0], k = combo[j][1];
@@ -530,17 +603,27 @@ MuseScore {
                     // Each note of a chord labels against its own position
                     // (a fingered tenth spans two).
                     var ftxt = "" + k;
-                    if (writeHL.checked) {
+                    if (writeHL.checked && k !== Core.THUMB) {
                         var evKey = events[i].key != null ? events[i].key : key;
                         ftxt = Core.hlLabel(s, k, combo[j][2], combo[j][4],
                                             evKey, activeInst);
                     }
-                    var fing = newElement(Element.FINGERING);
-                    fing.text = ftxt;
-                    fing.color = markerColor;
-                    noteRefs[0].add(fing);
-                    newItems.push([events[i].tick, pitchInfo.midi, "f", ftxt, targetStaff]);
-                    nFing++;
+                    if (k === Core.THUMB) {
+                        // chord-level sign, once per chord
+                        if (!thumbWritten && writeThumb(noteRefs[0], markerColor)) {
+                            newItems.push([events[i].tick, Core.THUMB_PITCH, "f",
+                                           Core.THUMB_KEY, targetStaff]);
+                            thumbWritten = true;
+                            nFing++;
+                        }
+                    } else {
+                        var fing = newElement(Element.FINGERING);
+                        fing.text = ftxt;
+                        fing.color = markerColor;
+                        noteRefs[0].add(fing);
+                        newItems.push([events[i].tick, pitchInfo.midi, "f", ftxt, targetStaff]);
+                        nFing++;
+                    }
                 }
                 if (writeStrings.checked && !hadString) {
                     var stringNum = activeInst.strings.tuning.length - s;
@@ -672,6 +755,7 @@ MuseScore {
         }).join(" ");
         statusText.text = "Instrument: " + activeInstrument + " / Key: " + key + " (" + (key > 0 ? key + " sharps" : key < 0 ? (-key) + " flats" : "C major / A minor") + ")\n"
             + "Done: " + events.length + " events processed\n"
+            + (thumbProblem ? "Could not write the thumb sign: " + thumbProblem + "\n" : "")
             + "Fingers written: " + stats.fing
             + (writeStrings.checked ? " / strings: " + stats.str : "")
             + (writePositions.checked ? " / positions: " + stats.pos : "")

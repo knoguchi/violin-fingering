@@ -94,8 +94,9 @@ constraints like plain digits.
 - Harmonics split the piece into independent segments
 
 ## Known limitations
-- Cello support is a first cut: chromatic frame with half position, no
-  thumb position or extensions yet, weights untuned (all per-instrument
+- Cello support is a first cut: chromatic frame with half position and a
+  thumb (written as the thumb-position sign); no extensions, and thumb and other weights are
+  untuned placeholders (all per-instrument
   values live in `INSTRUMENTS` in `violin_fingering_core.js`)
 - Harmonics (other than the 0+finger notation) are not specially detected
 - Pizzicato, col legno, and other special techniques are processed as
