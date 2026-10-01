@@ -834,3 +834,22 @@ test('cello: C melodic minor across the four strings matches the teacher exactly
         assert.deepStrictEqual(res.map(function (r) { return r.combo[0][STR]; }), strs, 'strings, key ' + key);
     }
 });
+
+// Bars 5-10 of the BWV 1007 prelude (G major) with the fingering written in Kenji's cello
+// teacher's part (read from a photo; bars 6 and 8 repeat a marked group, so only the marks
+// actually written are scored). A floor, not a target: the plugin matches 52 of 73 written
+// marks (71%); the misses are string-crossing (bar 6: open A3 vs finger 4) and hand height
+// (bar 8: the teacher sits one semitone higher).
+test('cello: Bach prelude bars 5-10 agree with the teacher on at least 52 of 73 written marks', function () {
+    const d = require('./bach_bars_5_10.json');
+    const res = core.solveChords(melody(d.pitches), 1, 20, 'cello');
+    assert.ok(res);
+    let ok = 0, n = 0;
+    res.forEach(function (r, i) {
+        if (!d.written[i]) return;
+        n++;
+        if (r.combo[0][FING] === d.fingers[i]) ok++;
+    });
+    assert.strictEqual(n, 73);
+    assert.ok(ok >= 52, 'matched ' + ok + ' of ' + n);
+});
