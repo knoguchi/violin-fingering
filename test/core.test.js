@@ -679,3 +679,22 @@ test('cello: F# major agrees with the teacher on the opening and the final three
         });
     }
 });
+
+// Ab major, two octaves, as played by Kenji's cello teacher (relayed by Kenji, taken as
+// standard): 1 3 | 1 2 4 | 1 3 4 | 1 3 2 4 | 1 3 4. The start (half position on the G string)
+// and the 1 3 2 4 group (a half-step shift to II with the finger number falling) differ:
+// the plugin starts on the C string in VI and shifts to III. Its own cost for the teacher's
+// full fingering is only about 3% above its pick.
+test('cello: Ab major agrees with the teacher except the start and the 1 3 2 4 group', function () {
+    const ps   = [44, 46, 48, 49, 51, 53, 55, 56, 58, 60, 61, 63, 65, 67, 68];
+    const want = [1, 3, 1, 2, 4, 1, 3, 4, 1, 3, 2, 4, 1, 3, 4];
+    const skip = [0, 1, 10, 11];
+    for (const key of [-4, 0, 3]) {                                   // key signature must not matter
+        const res = core.solveChords(melody(ps), key, 20, 'cello');
+        assert.ok(res);
+        res.forEach(function (r, i) {
+            if (skip.indexOf(i) >= 0) return;
+            assert.strictEqual(r.combo[0][FING], want[i], 'finger of note ' + i + ', key ' + key);
+        });
+    }
+});
