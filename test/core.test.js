@@ -543,3 +543,23 @@ test('cello: D major over two octaves with the open hand (extension) is 1 2 4 | 
                            [1, 2, 4, 0, 1, 2, 4, 0, 1, 3, 4, 0, 1, 3, 4]);
     res.forEach(function (r, i) { assert.strictEqual(r.pos, 1, 'note ' + i); });
 });
+
+test('cello: G major over two octaves is 0 1 3 4 | 0 1 3 4 | 0 1 2 4 | shift on the A string | 1 3 4', function () {
+    // Supplied by Kenji. The last three notes (E F# G) are played 1 3 4 after a
+    // shift on the A string. The shifted position is checked only as "one
+    // position above I, the same for the three notes": the plugin writes the
+    // chromatic index (VI) where the Suzuki handbook says "4th position".
+    const ps   = [43, 45, 47, 48, 50, 52, 54, 55, 57, 59, 60, 62, 64, 66, 67];
+    const want = [0, 1, 3, 4, 0, 1, 3, 4, 0, 1, 2, 4, 1, 3, 4];
+    const strs = [1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3];   // G G G G D D D D A A A A A A A
+    for (const key of [1, 0, -3]) {                                  // key signature must not matter
+        const res = core.solveChords(melody(ps), key, 20, 'cello');
+        assert.ok(res);
+        assert.deepStrictEqual(res.map(function (r) { return r.combo[0][FING]; }), want, 'fingers, key ' + key);
+        assert.deepStrictEqual(res.map(function (r) { return r.combo[0][STR]; }), strs, 'strings, key ' + key);
+        for (let i = 0; i < 12; i++) assert.strictEqual(res[i].pos, 1, 'note ' + i + ' position');
+        assert.ok(res[12].pos > 1, 'the shift on the A string');
+        assert.strictEqual(res[13].pos, res[12].pos);
+        assert.strictEqual(res[14].pos, res[12].pos);
+    }
+});
