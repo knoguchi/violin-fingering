@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.6.0-rc2 (2026-10-01)
 
 - Cello key map: for each key signature (major and melodic minor, the mode read from
   the notes) the string and finger of each scale tone from a cellist's two-octave
