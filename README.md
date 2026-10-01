@@ -37,10 +37,11 @@ Annotated by the plugin:
 The **Staff** dropdown picks the part to process (one staff at a time);
 it defaults to the staff of the current selection. A range selection
 narrows the tick window; with none, the whole score is processed. The
-staff's instrument is pre-selected from the part (Violin / Viola / Cello
-radio buttons; override them if detection is wrong, and the last choice
+staff's instrument is pre-selected from the part (Violin / Viola radio
+buttons; override them if detection is wrong, and the last choice
 is remembered). Viola uses C-G-D-A tuning with the same hand model a fifth
-lower; cello uses a chromatic (semitone-per-finger) hand frame.
+lower. Tick **Experimental instruments** to also get Cello (a chromatic,
+semitone-per-finger hand frame) and a 5-string violin (C-G-D-A-E).
 Repeat per part in a multi-part score.
 
 - **Run**: computes fingering for the selection (or the whole score) and writes

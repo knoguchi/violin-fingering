@@ -11,6 +11,8 @@
 //   strings: what it is   - tuning, names, labels
 //   hand:    left-hand geometry - frame model, finger offsets, positions
 //   cost:    weights the solver minimises
+// "experimental: true" instruments are hidden in the dialog unless the
+// experimental option is on.
 // Functions take an instrument (name or config object) as their trailing
 // argument; omitted means violin.
 
@@ -87,6 +89,7 @@ function withDefaults(over) {
 var INSTRUMENTS = {
     violin: {
         name: "violin",
+        label: "Violin",
         detect: /violin/i,
         strings: {
             tuning: [55, 62, 69, 76],          // G3 D4 A4 E5 (low to high)
@@ -108,6 +111,7 @@ var INSTRUMENTS = {
     },
     viola: {
         name: "viola",
+        label: "Viola",
         detect: /viola/i,
         strings: {
             tuning: [48, 55, 62, 69],          // C3 G3 D4 A4
@@ -130,6 +134,8 @@ var INSTRUMENTS = {
     // weights, to be tuned against real cello fingerings.
     cello: {
         name: "cello",
+        label: "Cello",
+        experimental: true,
         detect: /cello/i,
         strings: {
             tuning: [36, 43, 50, 57],          // C2 G2 D3 A3
@@ -164,6 +170,31 @@ var INSTRUMENTS = {
                 fingerHighPos: [0, 0, 0.1, 0.3],
                 highPosStart: 9
         })
+    },
+    // Five-string violin (C G D A E): the violin hand on a viola-plus-E
+    // tuning. Never auto-detected from the part; pick it with the radio.
+    violin5: {
+        name: "violin5",
+        label: "5-string violin",
+        experimental: true,
+        detect: null,
+        strings: {
+            tuning: [48, 55, 62, 69, 76],      // C3 G3 D4 A4 E5
+            names: ["C", "G", "D", "A", "E"],
+            labels: ["①", "②", "③", "④", "⑤"]
+        },
+        hand: {
+            frameModel: "diatonic",
+            frameOffsets: [0, 2, 3, 5],
+            frameAnchor: 2,
+            hlEnabled: true,
+            minPosition: 1,
+            maxPosition: 7
+        },
+        // Starting values: the low C is as forgiving as the viola's.
+        cost: withDefaults({
+            open: [0.25, 0.3, 0.4, 0.5, 0.65]
+        })
     }
 };
 
@@ -177,7 +208,7 @@ function resolveInst(x) {
 // or "" when unrecognized.
 function detectInstrument(id) {
     for (var n in INSTRUMENTS)
-        if (INSTRUMENTS[n].detect.test(id || "")) return n;
+        if (INSTRUMENTS[n].detect && INSTRUMENTS[n].detect.test(id || "")) return n;
     return "";
 }
 

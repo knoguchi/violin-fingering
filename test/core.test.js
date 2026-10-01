@@ -366,3 +366,28 @@ test('INSTRUMENTS: per-string and per-finger arrays match the config', function 
         assert.ok(inst.hand.minPosition <= inst.hand.maxPosition, name + ' position range');
     });
 });
+
+test('INSTRUMENTS: only cello and 5-string violin are experimental', function () {
+    const exp = Object.keys(core.INSTRUMENTS).filter(function (n) {
+        return core.INSTRUMENTS[n].experimental;
+    });
+    assert.deepStrictEqual(exp, ['cello', 'violin5']);
+});
+
+// --- 5-string violin ---
+
+test('violin5: never auto-detected; violin and viola ids unchanged', function () {
+    assert.strictEqual(core.detectInstrument('strings.violin'), 'violin');
+    assert.strictEqual(core.detectInstrument('strings.viola'), 'viola');
+});
+
+test('violin5: open E is a candidate and costs are finite', function () {
+    const open = core.candidatesForPitch(76, 0, 7, 'violin5')
+        .filter(function (c) { return c[0] === 4 && c[1] === 0; });
+    assert.strictEqual(open.length, 1);
+    // string 1 = highest: pins the open E (index 4), which needs a finite open cost
+    const res = core.solveChords(melody([{pitch: 76, string: 1}]), 0, 7, 'violin5');
+    assert.ok(res);
+    assert.strictEqual(res[0].combo[0][STR], 4);
+    assert.strictEqual(res[0].combo[0][FING], 0);
+});

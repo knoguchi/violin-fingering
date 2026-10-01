@@ -8,9 +8,12 @@
   viola output is unchanged (golden snapshot test).
 - Cello (first cut): chromatic hand frame incl. half position, cello
   weights favoring fingers 1-2 high up the neck. No thumb position yet.
-- Instrument radio buttons (Violin/Viola/Cello), pre-selected from the
-  part and remembered between runs. String-number key follows the
-  instrument.
+- Instrument radio buttons, pre-selected from the part and remembered
+  between runs. String-number key follows the instrument.
+- Cello and a 5-string violin (C-G-D-A-E) are experimental: hidden unless
+  "Experimental instruments" is ticked in the dialog (remembered). A part
+  detected as cello while that is off shows a hint instead of being
+  fingered as a violin.
 
 - Finger placement indicators (#4): optional `1L`/`2L`/`3H`/`4L` suffixes
   on finger numbers, relative to the 1-23-4 hand shape. First position is
