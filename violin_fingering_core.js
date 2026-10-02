@@ -308,7 +308,7 @@ var INSTRUMENTS = {
                 chordPosSpanPair: 4,
                 // Cost of departing from the cello key map (CELLO_KEY_MAP).
                 keyMap: 0.6,
-                graceCross: 3,
+                graceCross: 10,
                 // Fourth finger is rarely used in the lower positions and almost
                 // never up the neck; third thins out too (1/2 dominate high up).
                 // The 5th entry is the thumb (see hand.thumb for when it

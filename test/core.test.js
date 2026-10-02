@@ -628,3 +628,15 @@ test('cello: a grace note stays on the string of its main note (Elgar concerto, 
     assert.strictEqual(res[4].combo[0][FING], 2);       // G3
     assert.strictEqual(res[3].combo[0][STR], res[4].combo[0][STR]);
 });
+
+test('cello: a descending run keeps its grace note on the main note\'s string, hand placed first (Elgar m4)', function () {
+    // C3 B2 A2 [grace D3] C3 B2: the grace stays on the G string with finger 4 (hand in III)
+    // instead of crossing to the open D and back.
+    const notes = [48, 47, 45, 50, 48, 47].map(function (p, i) {
+        return {pitches: [{pitch: p}], grace: i === 3};
+    });
+    const res = core.solveChords(notes, 1, undefined, 'cello');
+    assert.ok(res);
+    assert.strictEqual(res[3].combo[0][STR], res[4].combo[0][STR]);   // grace and main note: same string
+    assert.notStrictEqual(res[3].combo[0][FING], 0);                  // not the open string
+});
