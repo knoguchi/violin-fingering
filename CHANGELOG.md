@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Cello chords: triple and quadruple stops keep one hand position (`chordPosSpan` 0), and the
+  scale key map no longer applies to chords. The Elgar concerto's opening chords now come out
+  as a professional cellist plays them (`1 1 2 4` in III, `0 0 1 4` in I).
 - Status line: counts notes (not chords) and says "1 sharp" / "1 flat".
 - Cello: positions up to 30 (E6 with finger 1) instead of 20; a part with notes above A5
   (B5 C6 D#6 E6) no longer fails with "some notes outside cello range".

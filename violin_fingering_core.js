@@ -300,7 +300,9 @@ var INSTRUMENTS = {
                 posCostSlope: 0.08,
                 altLowString: 0.015,
                 posSpread: 0.25,
-                chordPosSpan: 2,
+                // Triple and quadruple stops sit in one hand position (a professional cellist's
+                // chords at the opening of the Elgar concerto do); double stops may spread.
+                chordPosSpan: 0,
                 chordPosSpanPair: 4,
                 // Cost of departing from the cello key map (CELLO_KEY_MAP).
                 keyMap: 0.6,
@@ -581,7 +583,10 @@ function candidatesForEvent(notes, key, maxPosition, instrument, mode) {
     var perNote = [];
     for (var i = 0; i < notes.length; i++) {
         var cs = candidatesForPitch(notes[i].pitch, key, maxPosition, inst);
-        addKeyMapCandidates(cs, notes[i].pitch, keyMapFor(inst, key, mode), maxPosition, inst);
+        // The key map describes scales: it applies to single notes, not to chords, whose
+        // notes share one hand placement.
+        var kmap = notes.length === 1 ? keyMapFor(inst, key, mode) : null;
+        addKeyMapCandidates(cs, notes[i].pitch, kmap, maxPosition, inst);
         if (notes[i].string != null) {
             var ms = inst.strings.tuning.length - notes[i].string;
             cs = cs.filter(function (c) { return c[0] === ms; });
@@ -594,7 +599,7 @@ function candidatesForEvent(notes, key, maxPosition, instrument, mode) {
         // Mark candidates whose displacement direction contradicts the
         // note's spelling (+1 sharp side, -1 flat side, 0/absent unknown).
         var sp = notes[i].spell;
-        var km = keyMapFor(inst, key, mode);
+        var km = kmap;
         cs = cs.map(function (c) {
             var d = c.slice();
             d[5] = (sp && d[3] !== 0 && d[3] !== sp) ? 1 : 0;

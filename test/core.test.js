@@ -596,3 +596,21 @@ test('cello: a run up to E6 is playable with the default range', function () {
     assert.ok(res);
     assert.strictEqual(res.length, 8);
 });
+
+test('cello: triple and quadruple stops keep one hand position (Elgar concerto, opening chords)', function () {
+    // A professional cellist plays E2 B2 G3 E4 as 1 1 2 4 (all in III) and C2 G2 E3 D4 as
+    // 0 0 1 4 (all in I). A looser span spread them over two or three positions.
+    const chord = function (ps) { return {pitches: ps.map(function (p) { return {pitch: p}; })}; };
+    const res = core.solveChords([chord([40, 47, 55, 64]), chord([36, 43, 52, 62])], 1, undefined, 'cello');
+    assert.ok(res);
+    const fingers = function (r) {
+        return r.combo.slice().sort(function (a, b) { return a[4] - b[4]; })
+                .map(function (c) { return c[FING]; }).join('');
+    };
+    assert.strictEqual(fingers(res[0]), '1124');
+    assert.strictEqual(fingers(res[1]), '0014');
+    res.forEach(function (r) {
+        const pos = r.combo.filter(function (c) { return c[FING] > 0; }).map(function (c) { return c[POS]; });
+        pos.forEach(function (p) { assert.strictEqual(p, pos[0]); });
+    });
+});
