@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.6.1 (2026-10-02)
 
 - Cello: a string number written on a note (the circled 1-4 / String Number style) now keeps
   applying to the notes that follow, until the next string number or until a note cannot be
