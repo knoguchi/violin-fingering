@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Cello: fingers 3 and 4 cost more (0.5 and 1.0) and the key map weighs more (0.6). The
+  prelude no longer drifts into runs like `3 3 4 3 4 3 4 3`: finger 3 and 4 are 28% of
+  the notes (53% of bars 5-10 before; the teacher's bars 5-10 are 29%). Scale fingerings
+  match 92% (250 of 271), and bar 8 comes out as 1 1 2 1 like the teacher's.
+
 ## 1.6.0-rc3 (2026-10-01)
 
 - Fix (cello): the major or minor key map was chosen from the whole piece, so a major

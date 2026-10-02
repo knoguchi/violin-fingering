@@ -534,7 +534,7 @@ test('cello: scale fingerings never fall below their recorded match', function (
         assert.ok(ok >= sc.floor, sc.name + ': matched ' + ok + ' of ' + sc.pitches.length + ', floor ' + sc.floor);
         total += ok; notes += sc.pitches.length;
     });
-    assert.ok(total >= 245, 'total ' + total + ' of ' + notes);
+    assert.ok(total >= 250, 'total ' + total + ' of ' + notes);
 });
 
 test('cello: C major and C minor match the teacher exactly', function () {
@@ -547,10 +547,10 @@ test('cello: C major and C minor match the teacher exactly', function () {
 
 // Bars 5-10 of the BWV 1007 prelude (G major) with the fingering written in Kenji's cello
 // teacher's part (read from a photo; bars 6 and 8 repeat a marked group, so only the marks
-// actually written are scored). A floor, not a target: the plugin matches 52 of 73 written
-// marks (71%); the misses are string-crossing (bar 6: open A3 vs finger 4) and hand height
-// (bar 8: the teacher sits one semitone higher).
-test('cello: Bach prelude bars 5-10 agree with the teacher on at least 52 of 73 written marks', function () {
+// actually written are scored). A floor, not a target: the plugin matches 57 of 73 written
+// marks (78%); bar 8 now comes out as 1 1 2 1 like the teacher's, the remaining misses are
+// mostly string crossing in bar 7 (open A3 vs finger 4).
+test('cello: Bach prelude bars 5-10 agree with the teacher on at least 57 of 73 written marks', function () {
     const d = require('./bach_bars_5_10.json');
     const res = core.solveChords(melody(d.pitches), 1, 20, 'cello');
     assert.ok(res);
@@ -561,7 +561,7 @@ test('cello: Bach prelude bars 5-10 agree with the teacher on at least 52 of 73 
         if (r.combo[0][FING] === d.fingers[i]) ok++;
     });
     assert.strictEqual(n, 73);
-    assert.ok(ok >= 52, 'matched ' + ok + ' of ' + n);
+    assert.ok(ok >= 57, 'matched ' + ok + ' of ' + n);
 });
 
 test('cello: the mode is read locally, not over the whole piece', function () {
