@@ -640,3 +640,22 @@ test('cello: a descending run keeps its grace note on the main note\'s string, h
     assert.strictEqual(res[3].combo[0][STR], res[4].combo[0][STR]);   // grace and main note: same string
     assert.notStrictEqual(res[3].combo[0][FING], 0);                  // not the open string
 });
+
+test('cello: a string number on a note keeps applying to the notes after it', function () {
+    // sway.mscz: six repeated A3s, then A#3 A3 G3 ... A string number 2 (the D string) on the
+    // first A3 used to pin that note only; the next A3 jumped to the open A string.
+    const ps = [57, 57, 57, 57, 57, 57, 58, 57, 55, 58, 57, 55, 57, 55, 53, 53];
+    const make = function (pin) {
+        return ps.map(function (p, i) {
+            return {pitches: [Object.assign({pitch: p}, pin && i === 0 ? {string: 2} : {})]};
+        });
+    };
+    const pinned = core.solveChords(make(true), -1, undefined, 'cello');
+    assert.ok(pinned);
+    pinned.forEach(function (r, i) { assert.strictEqual(r.combo[0][STR], 2, 'note ' + i + ' on the D string'); });
+    // a later string number takes over
+    const ev = make(true);
+    ev[8] = {pitches: [{pitch: 55, string: 3}]};                       // G string from the 9th note on
+    const moved = core.solveChords(ev, -1, undefined, 'cello');
+    assert.strictEqual(moved[8].combo[0][STR], 1);
+});

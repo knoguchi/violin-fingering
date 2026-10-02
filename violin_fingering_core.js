@@ -81,7 +81,10 @@ var DEFAULT_COST = {
     keyMap: 0,
     // Extra weight on a string crossing next to a grace note, as a multiple of the
     // ordinary crossing cost: an ornament is played on the string of its main note.
-    graceCross: 0
+    graceCross: 0,
+    // Cost of leaving a string the player asked for: a string number written on a note
+    // keeps applying to the notes that follow, until another string number.
+    stickyString: 0
 };
 
 function withDefaults(over) {
@@ -309,6 +312,7 @@ var INSTRUMENTS = {
                 // Cost of departing from the cello key map (CELLO_KEY_MAP).
                 keyMap: 0.6,
                 graceCross: 10,
+                stickyString: 4,
                 // Fourth finger is rarely used in the lower positions and almost
                 // never up the neck; third thins out too (1/2 dominate high up).
                 // The 5th entry is the thumb (see hand.thumb for when it
@@ -547,6 +551,25 @@ function keyModes(events, key) {
     return modes;
 }
 
+// String index (0 = lowest) each single-note event is asked to stay on, or -1. A string
+// number written on a note (pitches[0].string, 1 = highest string) applies to the notes after
+// it until another string number, and ends where the next note cannot be played on it.
+function stickyStrings(events, key, maxPosition, inst) {
+    var n = inst.strings.tuning.length, out = [], cur = -1;
+    for (var i = 0; i < events.length; i++) {
+        var ps = events[i].pitches, evKey = events[i].key != null ? events[i].key : key;
+        if (ps.length !== 1) { out.push(-1); continue; }
+        if (ps[0].string != null) { cur = n - ps[0].string; out.push(-1); continue; }
+        var ok = false;
+        if (cur >= 0) {
+            var cs = candidatesForPitch(ps[0].pitch, evKey, maxPosition, inst);
+            for (var j = 0; j < cs.length; j++) if (cs[j][0] === cur) { ok = true; break; }
+        }
+        if (ok) out.push(cur); else { cur = -1; out.push(-1); }
+    }
+    return out;
+}
+
 // Marks a candidate entry as belonging to a grace note (only then, so other output keeps its shape).
 function withGrace(entry, isGrace) {
     if (isGrace) entry.grace = true;
@@ -586,7 +609,7 @@ function addKeyMapCandidates(cs, pitch, km, maxPosition, inst) {
     }
 }
 
-function candidatesForEvent(notes, key, maxPosition, instrument, mode, isGrace) {
+function candidatesForEvent(notes, key, maxPosition, instrument, mode, isGrace, sticky) {
     var inst = resolveInst(instrument);
     if (maxPosition === undefined) maxPosition = inst.hand.maxPosition;
     var perNote = [];
@@ -613,6 +636,7 @@ function candidatesForEvent(notes, key, maxPosition, instrument, mode, isGrace) 
             var d = c.slice();
             d[5] = (sp && d[3] !== 0 && d[3] !== sp) ? 1 : 0;
             if (km) d[6] = keyMapMiss(km, d);
+            if (sticky >= 0 && d[0] !== sticky) d[8] = 1;
             return d;
         });
         perNote.push(cs);
@@ -680,6 +704,7 @@ function chordLocalCost(entry, inst) {
         if (off !== 0) c += inst.cost.accidental;
         if (combo[i][5]) c += inst.cost.spell;
         if (combo[i][6]) c += inst.cost.keyMap;
+        if (combo[i][8]) c += inst.cost.stickyString;
         if (k > 0) {
             positions.push(p);
             c += inst.cost.altLowString * Math.max(0, p - 1) * (top - s);
@@ -771,7 +796,12 @@ function chordTransCost(prev, cur, instrument) {
 function solveChords(events, key, maxPosition, instrument) {
     var inst = resolveInst(instrument);
     if (!events.length) return [];
-    var modes = inst.keyMap ? keyModes(events, key) : null;
+    var modes = null;
+    if (inst.keyMap || inst.cost.stickyString) {
+        var km = inst.keyMap ? keyModes(events, key) : null;
+        var sk = inst.cost.stickyString ? stickyStrings(events, key, maxPosition, inst) : null;
+        modes = events.map(function (_, i) { return {mode: km && km[i], sticky: sk ? sk[i] : -1}; });
+    }
     var out = [];
     var start = 0;
     for (var i = 1; i <= events.length; i++) {
@@ -847,7 +877,8 @@ function solveChordSeg(events, key, maxPosition, instrument, allowThumb, modes) 
     var layers = [];
     for (var i = 0; i < events.length; i++) {
         var evKey = events[i].key != null ? events[i].key : key;
-        var combos = candidatesForEvent(events[i].pitches, evKey, maxPosition, inst, modes && modes[i], events[i].grace);
+        var cx = modes && modes[i];
+        var combos = candidatesForEvent(events[i].pitches, evKey, maxPosition, inst, cx && cx.mode, events[i].grace, cx ? cx.sticky : -1);
         if (allowThumb && !allowThumb[i]) combos = combos.filter(noThumb);
         if (!combos.length) return null;
         layers.push(combos);

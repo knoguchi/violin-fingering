@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Cello: a string number written on a note (the circled 1-4 / String Number style) now keeps
+  applying to the notes that follow, until the next string number or until a note cannot be
+  played on that string (`cost.stickyString`). Before, it pinned that one note only: a
+  string 2 on the first of six repeated A3s left the other five on the open A.
 - Cello grace notes: a string crossing next to a grace note costs 11 times as much
   (`cost.graceCross` 10), so an ornament stays on the string of its main note, with the
   hand already placed for it, instead of jumping to an open string (Elgar concerto m3:
