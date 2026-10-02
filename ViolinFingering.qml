@@ -18,7 +18,7 @@ import "violin_fingering_core.js" as Core
 
 MuseScore {
     id: plugin
-    version: "1.6.0-rc3"
+    version: "1.6.0"
     title: "ViolinFingering"
     description: "Violin fingering (string/finger/position) by dynamic programming. Reads key signature; writes finger numbers and Roman-numeral position marks."
     pluginType: "dialog"

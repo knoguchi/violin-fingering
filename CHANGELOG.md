@@ -1,67 +1,49 @@
 # Changelog
 
-## Unreleased
+## 1.6.0 (2026-10-01)
 
-- Cello: fingers 3 and 4 cost more (0.5 and 1.0) and the key map weighs more (0.6). The
-  prelude no longer drifts into runs like `3 3 4 3 4 3 4 3`: finger 3 and 4 are 28% of
-  the notes (53% of bars 5-10 before; the teacher's bars 5-10 are 29%). Scale fingerings
-  match 92% (250 of 271), and bar 8 comes out as 1 1 2 1 like the teacher's.
+Cello and a 5-string violin join the violin and viola. Cello support is experimental and was
+written without a cellist; it has been compared with one teacher's scale fingerings, not
+validated by cello players yet.
 
-## 1.6.0-rc3 (2026-10-01)
+**Instruments**
+- Per-instrument config: tuning, hand-frame geometry and cost weights live in `INSTRUMENTS`
+  (violin, viola, cello, 5-string violin); functions take an instrument name or config.
+  Violin and viola output is unchanged (golden snapshot test).
+- Cello: chromatic hand frame (the four fingers of a position sit on consecutive semitones)
+  including half position; open strings cost little (idiomatic on the cello); fingers 3 and
+  4 cost more, so the fingering does not drift into runs like `3 3 4 3 4 3`.
+- Cello key map: for each key signature and mode (major or melodic minor, read from the notes
+  around each event) the string and finger of each scale tone from a cellist's two-octave
+  scales cost nothing; departing from them costs a little (`cost.keyMap`), like an accidental
+  on the violin. Open-hand fingerings the map names (fingers 1-2 a whole tone apart) become
+  candidates. Scale fingerings match 92% of notes (250 of 271).
+- Cello thumb position: the thumb is finger 5. MuseScore stores the thumb-position sign as
+  an articulation on the chord, so the plugin writes and reads that (one per chord; a
+  hand-placed sign pins the chord's lowest note to the thumb; Clear removes the plugin's own).
+  The solver fingers without the thumb first and lets it compete only where the local cost
+  exceeds a threshold. Offset, entry position, threshold and cost are placeholders.
+- 5-string violin (C-G-D-A-E), chosen by hand.
 
-- Fix (cello): the major or minor key map was chosen from the whole piece, so a major
-  piece that touches its relative minor (the Bach prelude has a D#) used the minor map
-  throughout and opened in IV. The mode is now read from the notes around each event.
+**Dialog**
+- Instrument radio buttons (all instruments visible), pre-selected from the part and
+  remembered between runs; cello and 5-string violin show "is experimental" in red.
+- Selection wins: a range selection decides the staff (its first) and the tick range; the
+  Staff dropdown shows only with no selection. A summary line names the target.
+- Less text: short checkbox labels (details in tooltips); the status area starts with the
+  version, which is kept above every result or error.
+- The plugin sits at the top level of the Plugins menu.
 
-## 1.6.0-rc2 (2026-10-01)
-
-- Cello key map: for each key signature (major and melodic minor, the mode read from
-  the notes) the string and finger of each scale tone from a cellist's two-octave
-  scales cost nothing; departing from them costs a little (`cost.keyMap`), like an
-  accidental on the violin. Open-hand fingerings the map names (fingers 1-2 a whole
-  tone apart) become candidates. Scale fingerings now match 90% of notes (was 73%);
-  the 86 sparse Bach marks agree less (44, was 50), which those marks cannot judge.
-- `gen_golden.js` moved to `tools/`: `node --test` was running it and rewriting the
-  golden snapshot on every test run.
-
-## 1.6.0-rc1 (2026-10-01)
-
-- The plugin sits at the top level of the Plugins menu (no category), so it
-  is one click away instead of under Composing/arranging tools.
-- Selection wins: a range selection decides the staff (its first) and the
-  tick range; the Staff dropdown shows only with no selection. A summary
-  line names the target.
-- Per-instrument config: all tuning, hand-frame geometry and cost weights
-  moved into `INSTRUMENTS` (violin, viola, cello) in the core; functions
-  take an instrument name/config instead of a bare tuning. Violin and
-  viola output is unchanged (golden snapshot test).
-- Cello (first cut): chromatic hand frame incl. half position, cello
-  weights favoring fingers 1-2 high up the neck. Open strings cost little (they
-  are idiomatic on the cello): Bach's G major prelude now starts G D open,
-  B 1, A open in position I instead of a fingered shape in V.
-- Cello thumb position: the thumb is finger 5. MuseScore stores the
-  thumb-position sign as an articulation on the chord, so the plugin writes
-  and reads that (one per chord; a hand-placed sign pins the chord's lowest
-  note to the thumb; Clear removes the plugin's own). The solver fingers without the
-  thumb first and lets it compete only where the local cost (averaged over +/- 6 events) exceeds a
-  threshold; a hand-placed sign always counts. Offset, entry position,
-  threshold and cost are placeholders to tune against real cello fingerings.
-- Annotation recognition (Clear, re-run, manual constraints) is now built
-  from the config: position marks up to XX and the half mark, string
-  marks up to the largest string count (fixes cello positions above VIII
-  and the 5-string violin's fifth string being left behind).
-- Instrument radio buttons, pre-selected from the part and remembered
-  between runs. String-number key follows the instrument.
-- Cello and a 5-string violin (C-G-D-A-E) are offered next to Violin and
-  Viola; the dialog shows "<instrument> is experimental" in red while one
-  is selected.
-
-- Finger placement indicators (#4): optional `1L`/`2L`/`3H`/`4L` suffixes
-  on finger numbers, relative to the 1-23-4 hand shape. First position is
-  anchored to the nut (key-independent); higher positions to the hand
-  frame. Computed as post-processing (`hlLabel` in the core); the solver
-  is unchanged. Suffixed annotations are recognized on re-run and Clear,
-  and hand-written ones are honored as finger constraints.
+**Other**
+- Annotation recognition (Clear, re-run, manual constraints) is built from the config:
+  position marks up to XX and the half mark, string marks up to the largest string count.
+- `gen_golden.js` moved to `tools/`: `node --test` was running it and rewriting the golden
+  snapshot on every test run.
+- Finger placement indicators (#4): optional `1L`/`2L`/`3H`/`4L` suffixes on finger numbers,
+  relative to the 1-23-4 hand shape. First position is anchored to the nut (key-independent);
+  higher positions to the hand frame. Computed as post-processing (`hlLabel` in the core);
+  the solver is unchanged. Suffixed annotations are recognized on re-run and Clear, and
+  hand-written ones are honored as finger constraints.
 
 ## 1.5.0 (2026-08-26)
 
