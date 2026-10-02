@@ -833,6 +833,15 @@ MuseScore {
                     statusText.forceActiveFocus();
                     statusText.selectAll();
                     statusText.copy();
+                    // Fallback if the clipboard does not take it: save it to a file.
+                    try {
+                        var f = Qt.createQmlObject(
+                            'import QtQuick 2.9; import FileIO 3.0; '
+                            + 'FileIO { source: "/tmp/violin-fingering-status.txt" }',
+                            plugin, "statusFile");
+                        if (f.write(statusText.text))
+                            statusBody = statusBody + "\n(copied; also saved to /tmp/violin-fingering-status.txt)";
+                    } catch (e) {}
                 }
             }
             Button { text: "Close"; onClicked: quit() }

@@ -4,8 +4,8 @@
 
 - Cello: positions up to 30 (E6 with finger 1) instead of 20; a part with notes above A5
   (B5 C6 D#6 E6) no longer fails with "some notes outside cello range".
-- A Copy button puts the status text on the clipboard (selecting it with the mouse did
-  not copy).
+- A Copy button puts the status text on the clipboard and also saves it to
+  `/tmp/violin-fingering-status.txt` (selecting it with the mouse did not copy).
 
 ## 1.6.0 (2026-10-01)
 
