@@ -78,7 +78,10 @@ var DEFAULT_COST = {
     fingerHighPos: [0, 0, 0, 0],
     highPosStart: 0,
     // Departing from the instrument's key map (cello only; see CELLO_KEY_MAP).
-    keyMap: 0
+    keyMap: 0,
+    // Extra weight on a string crossing next to a grace note, as a multiple of the
+    // ordinary crossing cost: an ornament is played on the string of its main note.
+    graceCross: 0
 };
 
 function withDefaults(over) {
@@ -291,11 +294,10 @@ var INSTRUMENTS = {
                 posShift: 1.0,
                 posFixed: 2.0,
                 stretchPerFinger: 1,
-                // Open strings are idiomatic on the cello (Bach's G major
-                // prelude arpeggiates them), so they cost little: with the
-                // violin-like values it fingered bar 1 in V instead of
-                // G D open, B 1, A open in I.
-                open: [0.08, 0.1, 0.15, 0.22],
+                // Open strings cost something on the cello too (no vibrato, a different tone from
+                // a fingered note), but little: Bach's G major prelude still opens G D open,
+                // B 1, A open in I with these values.
+                open: [0.15, 0.2, 0.3, 0.45],
                 posCost: [0, 0, 0.08, 0.08, 0.06, 0.06, 0.1, 0.1, 0.12, 0.14, 0.16, 0.18, 0.2],
                 posCostSlope: 0.08,
                 altLowString: 0.015,
@@ -306,6 +308,7 @@ var INSTRUMENTS = {
                 chordPosSpanPair: 4,
                 // Cost of departing from the cello key map (CELLO_KEY_MAP).
                 keyMap: 0.6,
+                graceCross: 3,
                 // Fourth finger is rarely used in the lower positions and almost
                 // never up the neck; third thins out too (1/2 dominate high up).
                 // The 5th entry is the thumb (see hand.thumb for when it
@@ -544,6 +547,12 @@ function keyModes(events, key) {
     return modes;
 }
 
+// Marks a candidate entry as belonging to a grace note (only then, so other output keeps its shape).
+function withGrace(entry, isGrace) {
+    if (isGrace) entry.grace = true;
+    return entry;
+}
+
 // 1 when the instrument has a key map entry for this pitch and the candidate
 // (string, finger) is not among its choices; 0 otherwise.
 function keyMapMiss(km, cand) {
@@ -577,7 +586,7 @@ function addKeyMapCandidates(cs, pitch, km, maxPosition, inst) {
     }
 }
 
-function candidatesForEvent(notes, key, maxPosition, instrument, mode) {
+function candidatesForEvent(notes, key, maxPosition, instrument, mode, isGrace) {
     var inst = resolveInst(instrument);
     if (maxPosition === undefined) maxPosition = inst.hand.maxPosition;
     var perNote = [];
@@ -625,13 +634,13 @@ function candidatesForEvent(notes, key, maxPosition, instrument, mode) {
                 var pos = fingeredPositions[0];
                 for (var z = 1; z < fingeredPositions.length; z++)
                     if (fingeredPositions[z] < pos) pos = fingeredPositions[z];
-                out.push({combo: picked.slice(), pos: pos, openOnly: false});
+                out.push(withGrace({combo: picked.slice(), pos: pos, openOnly: false}, isGrace));
             } else {
                 // All open strings: the hand does not have to move. Emit
                 // one candidate per position so the Viterbi carries the
                 // hand position through instead of snapping to I.
                 for (var q = 1; q <= maxPosition; q++)
-                    out.push({combo: picked.slice(), pos: q, openOnly: true});
+                    out.push(withGrace({combo: picked.slice(), pos: q, openOnly: true}, isGrace));
             }
             return;
         }
@@ -716,7 +725,9 @@ function chordTransCost(prev, cur, instrument) {
         if (s2 > mx2) mx2 = s2;
     }
     var gap = Math.max(0, mn2 - mx1, mn1 - mx2);
-    c += inst.cost.cross[Math.min(gap, inst.cost.cross.length - 1)];
+    var crossCost = inst.cost.cross[Math.min(gap, inst.cost.cross.length - 1)];
+    c += crossCost;
+    if (prev.grace || cur.grace) c += inst.cost.graceCross * crossCost;
     // Melodic finger continuity (single-note events only). Only within a
     // position: once the hand shifts, finger spacing and offsets are
     // relative to a new frame and the shift cost already covers the move.
@@ -836,7 +847,7 @@ function solveChordSeg(events, key, maxPosition, instrument, allowThumb, modes) 
     var layers = [];
     for (var i = 0; i < events.length; i++) {
         var evKey = events[i].key != null ? events[i].key : key;
-        var combos = candidatesForEvent(events[i].pitches, evKey, maxPosition, inst, modes && modes[i]);
+        var combos = candidatesForEvent(events[i].pitches, evKey, maxPosition, inst, modes && modes[i], events[i].grace);
         if (allowThumb && !allowThumb[i]) combos = combos.filter(noThumb);
         if (!combos.length) return null;
         layers.push(combos);

@@ -664,6 +664,7 @@ MuseScore {
                             spell: p.spell || 0, harmonic: p.harmonic || false};
                 }),
                 key: e.key,   // key signature in effect at this tick
+                grace: !!e.grace,
                 isHarmonic: hasHarmonic
             };
         });

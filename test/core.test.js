@@ -614,3 +614,17 @@ test('cello: triple and quadruple stops keep one hand position (Elgar concerto, 
         pos.forEach(function (p) { assert.strictEqual(p, pos[0]); });
     });
 });
+
+test('cello: a grace note stays on the string of its main note (Elgar concerto, measure 3)', function () {
+    // A3 G3 F#3 [grace A3] G3 C3: a professional cellist plays the grace A3 with finger 4 and
+    // the G3 after it with finger 2, on the same string, rather than crossing to the open A.
+    const notes = [57, 55, 54, 57, 55, 48].map(function (p, i) {
+        return {pitches: [{pitch: p}], grace: i === 3};
+    });
+    const res = core.solveChords(notes, 1, undefined, 'cello');
+    assert.ok(res);
+    assert.strictEqual(res[1].combo[0][FING], 2);       // G3
+    assert.strictEqual(res[3].combo[0][FING], 4);       // grace A3
+    assert.strictEqual(res[4].combo[0][FING], 2);       // G3
+    assert.strictEqual(res[3].combo[0][STR], res[4].combo[0][STR]);
+});

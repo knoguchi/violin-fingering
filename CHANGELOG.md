@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Cello grace notes: a string crossing next to a grace note costs 4 times as much
+  (`cost.graceCross`), so an ornament stays on the string of its main note instead of
+  jumping to an open string (Elgar concerto m3: grace A3 with finger 4, G3 with 2).
+  The solver now receives the grace flag. Open-string costs are back to the original
+  0.15 / 0.2 / 0.3 / 0.45.
 - Cello chords: triple and quadruple stops keep one hand position (`chordPosSpan` 0), and the
   scale key map no longer applies to chords. The Elgar concerto's opening chords now come out
   as a professional cellist plays them (`1 1 2 4` in III, `0 0 1 4` in I).
