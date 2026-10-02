@@ -826,6 +826,15 @@ MuseScore {
                         + "\nPlease report: https://github.com/knoguchi/violin-fingering/issues"; }
                 }
             }
+            Button {
+                text: "Copy"
+                onClicked: {
+                    // Selecting by mouse does not copy in a plugin dialog on every platform.
+                    statusText.forceActiveFocus();
+                    statusText.selectAll();
+                    statusText.copy();
+                }
+            }
             Button { text: "Close"; onClicked: quit() }
         }
         Flickable {

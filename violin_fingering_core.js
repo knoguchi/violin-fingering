@@ -274,7 +274,7 @@ var INSTRUMENTS = {
             frameAnchor: 2,
             hlEnabled: false,
             minPosition: 0,         // half position: finger 1 a semitone above the open string
-            maxPosition: 20,
+            maxPosition: 30,        // E6 with finger 1; the cost of high positions keeps it rare
             // Thumb (finger 5, the thumb-position sign): a fifth hand slot
             // lying across the strings, offset semitones from finger 1 of the
             // same position, usable from minPosition up. A special case, not a

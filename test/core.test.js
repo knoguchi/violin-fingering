@@ -589,3 +589,10 @@ test('cello: Bach prelude opens G D open, B 1, A open in I, although it visits E
         assert.strictEqual(res[i].pos, 1, 'position of note ' + i);
     }
 });
+
+test('cello: a run up to E6 is playable with the default range', function () {
+    // B5 C6 D#6 E6 sat above the old limit (position 20) and made the whole staff unsolvable.
+    const res = core.solveChords(melody([83, 84, 87, 88, 83, 84, 87, 88]), 2, undefined, 'cello');
+    assert.ok(res);
+    assert.strictEqual(res.length, 8);
+});
