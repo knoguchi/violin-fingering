@@ -719,8 +719,11 @@ MuseScore {
             return;
         }
         var stats = writeAnnotations(events, result, key);
-        statusBody = "Done: " + events.length + " notes, "
-            + (key > 0 ? key + " sharps" : key < 0 ? (-key) + " flats" : "no accidentals") + "\n"
+        var noteCount = 0;
+        for (var ni = 0; ni < events.length; ni++) noteCount += events[ni].pitches.length;
+        statusBody = "Done: " + noteCount + " notes, "
+            + (key > 0 ? key + (key === 1 ? " sharp" : " sharps")
+               : key < 0 ? (-key) + (key === -1 ? " flat" : " flats") : "no accidentals") + "\n"
             + (thumbProblem ? "Thumb sign not written: " + thumbProblem + "\n" : "")
             + "Fingers " + stats.fing
             + (writeStrings.checked ? ", strings " + stats.str : "")

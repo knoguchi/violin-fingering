@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Status line: counts notes (not chords) and says "1 sharp" / "1 flat".
 - Cello: positions up to 30 (E6 with finger 1) instead of 20; a part with notes above A5
   (B5 C6 D#6 E6) no longer fails with "some notes outside cello range".
 - A Copy button puts the status text on the clipboard and also saves it to
