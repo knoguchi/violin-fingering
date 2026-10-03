@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- An event no hand can play no longer aborts the staff. Previously
+  `solveChords` returned null for the whole input, so one impossible event
+  (a note out of range, a note pinned to a string that cannot reach it, two
+  voices colliding on a string) left the score with no annotations at all.
+  Such events are now marked `{unsolved: true}`, break the chain like a pin,
+  and their neighbors are fingered normally. Twelve of the sixty golden
+  cases were whole phrases discarded this way; each now fingers every note
+  but the impossible one.
 - Violin and viola reach position XV instead of VII. The upper positions are
   ordinary repertoire - the Mendelssohn Andante reaches C7, out of reach
   below position VIII - and stopping at VII did not make them costly, it

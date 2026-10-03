@@ -796,12 +796,20 @@ function chordTransCost(prev, cur, instrument) {
 // Solve chord events. Each event = {pitches: [{pitch, string?, finger?}, ...]}
 // with an optional per-event key override (mid-piece key signature changes);
 // events without one use the piece-level key argument.
-// Returns aligned list of {combo, pos} or null.
+// Returns an aligned list of {combo, pos} entries, with {unsolved: true}
+// where no hand can play the event, or null if the whole input failed for
+// another reason.
 //
 // A manually noted finger is a reset: the player has declared where the
 // hand is, so the chain restarts there. Each segment [pin, next pin) is
 // solved independently - downstream context cannot drag notes before a
 // pin away from the pinned position, and vice versa.
+//
+// An event no hand can play (two voices colliding on one string, a chord
+// needing more strings than the pitches allow, a note out of range) is not
+// a reason to abandon the staff: it is marked unsolved, breaks the chain
+// like a pin, and its neighbors are still fingered. The caller decides
+// what to report.
 function solveChords(events, key, maxPosition, instrument) {
     var inst = resolveInst(instrument);
     if (!events.length) return [];
@@ -811,14 +819,38 @@ function solveChords(events, key, maxPosition, instrument) {
         var sk = inst.cost.stickyString ? stickyStrings(events, key, maxPosition, inst) : null;
         modes = events.map(function (_, i) { return {mode: km && km[i], sticky: sk ? sk[i] : -1}; });
     }
-    var out = [];
+    // Which events have no playable candidate at all. Checked here because
+    // segmenting has to know: such an event cannot sit inside a segment.
+    // (The thumb passes re-filter candidates per pass, so the layers
+    // themselves are left to solveChordSeg rather than hoisted.)
+    var playable = [];
+    for (var p = 0; p < events.length; p++) {
+        var pKey = events[p].key != null ? events[p].key : key;
+        var cx0 = modes && modes[p];
+        playable.push(candidatesForEvent(events[p].pitches, pKey, maxPosition, inst,
+                                         cx0 && cx0.mode, events[p].grace,
+                                         cx0 ? cx0.sticky : -1).length > 0);
+    }
+    var out = new Array(events.length);
     var start = 0;
-    for (var i = 1; i <= events.length; i++) {
-        if (i < events.length && !eventHasPin(events[i])) continue;
-        var seg = solveSegWithThumb(events.slice(start, i), key, maxPosition, inst, modes && modes.slice(start, i));
-        if (!seg) return null;
-        out = out.concat(seg);
+    for (var i = 0; i <= events.length; i++) {
+        var atEnd = (i === events.length);
+        var unsolved = !atEnd && !playable[i];
+        var pinned = !atEnd && eventHasPin(events[i]);
+        // Segment boundary: the end, an unplayable event, or a pin that is
+        // not already the start of this segment.
+        if (!atEnd && !unsolved && !(pinned && i > start)) continue;
+        if (i > start) {
+            var seg = solveSegWithThumb(events.slice(start, i), key, maxPosition, inst,
+                                        modes && modes.slice(start, i));
+            if (!seg) return null;
+            for (var j = 0; j < seg.length; j++) out[start + j] = seg[j];
+        }
         start = i;
+        if (unsolved) {
+            out[i] = {unsolved: true};
+            start = i + 1;
+        }
     }
     return out;
 }
@@ -889,6 +921,10 @@ function solveChordSeg(events, key, maxPosition, instrument, allowThumb, modes) 
         var cx = modes && modes[i];
         var combos = candidatesForEvent(events[i].pitches, evKey, maxPosition, inst, cx && cx.mode, events[i].grace, cx ? cx.sticky : -1);
         if (allowThumb && !allowThumb[i]) combos = combos.filter(noThumb);
+        // solveChords screens out events with no candidates at all, so an
+        // empty layer here means the thumb filter emptied it: null sends
+        // solveSegWithThumb back to its unfiltered first pass. A direct
+        // caller still gets null for a genuinely unplayable event.
         if (!combos.length) return null;
         layers.push(combos);
     }

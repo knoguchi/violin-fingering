@@ -121,6 +121,10 @@ constraints like plain digits.
   before a whole note is priced like a shift mid-run
 - Notes held across other voices (and tied continuations) do not occupy
   their string while later notes are solved
+- Notes at the same tick are solved as one chord, so independent voices
+  on a staff may collide on a string. Such an event cannot be fingered;
+  it is left unannotated and reported in the status line, and the notes
+  around it are fingered normally
 - Unison double stops (two noteheads on the same pitch) are merged into a
   single note
 - Trills and ornament symbols are not seen by the solver (a trilled note
