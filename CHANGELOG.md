@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+- Violin and viola reach position XV instead of VII. The upper positions are
+  ordinary repertoire - the Mendelssohn Andante reaches C7, out of reach
+  below position VIII - and stopping at VII did not make them costly, it
+  made them unplayable. `posCost` (extrapolated past its table by
+  `posCostSlope`) keeps high positions rare; the fingering of existing
+  passages is unchanged.
+- The status window no longer reports success when most of the score was
+  left blank. It gives the proportion fingered ("Partly done: 812 of 820
+  notes fingered"), the bars left unannotated as ranges, and the
+  out-of-range pitches by name and bar. Previously a run that solved one
+  passage and silently dropped the rest still printed "Done", so a part
+  with fingering in only 12 of 111 bars looked like a success.
+
 ## 1.6.1 (2026-10-02)
 
 - Cello: a string number written on a note (the circled 1-4 / String Number style) now keeps

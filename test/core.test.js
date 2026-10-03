@@ -659,3 +659,16 @@ test('cello: a string number on a note keeps applying to the notes after it', fu
     const moved = core.solveChords(ev, -1, undefined, 'cello');
     assert.strictEqual(moved[8].combo[0][STR], 1);
 });
+
+test('violin: the high repertoire range is playable (Mendelssohn Andante reaches C7)', function () {
+    // maxPosition used to be VII, which put C7/B6 out of range: notes violinists
+    // actually play came back with no candidates at all, and one of them made
+    // solveChords discard the whole part.
+    assert.ok(core.candidatesForPitch(96, 0, undefined, 'violin').length, 'C7 playable');
+    assert.ok(core.candidatesForPitch(95, 0, undefined, 'violin').length, 'B6 playable');
+    // Raising the cap must not drag ordinary passages up the fingerboard: a
+    // first-position D major run stays low.
+    const low = core.solveChords(melody([62, 64, 66, 67, 69, 71, 73, 74]), 2, undefined, 'violin');
+    assert.ok(low);
+    low.forEach(function (r, i) { assert.ok(r.pos <= 3, 'note ' + i + ' stays low, got ' + r.pos); });
+});

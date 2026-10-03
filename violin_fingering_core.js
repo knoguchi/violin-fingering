@@ -233,7 +233,14 @@ var INSTRUMENTS = {
             frameAnchor: 2,
             hlEnabled: true,
             minPosition: 1,
-            maxPosition: 7
+            // The violin repertoire goes well above VII - the Mendelssohn
+            // Andante alone reaches C7, out of reach below position VIII.
+            // Stopping at VII did not make those notes costly, it made them
+            // unplayable, and one of them discarded the whole part. Cap the
+            // reach high enough that the fingering is a real choice and let
+            // posCost (extrapolated past its table by posCostSlope) keep
+            // high positions rare.
+            maxPosition: 15
         },
         cost: DEFAULT_COST
     },
@@ -252,7 +259,9 @@ var INSTRUMENTS = {
             frameAnchor: 2,
             hlEnabled: true,
             minPosition: 1,
-            maxPosition: 7
+            // Same reasoning as the violin: the upper positions are played,
+            // just costly.
+            maxPosition: 15
         },
         cost: DEFAULT_COST
     },
