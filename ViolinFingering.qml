@@ -18,7 +18,7 @@ import "violin_fingering_core.js" as Core
 
 MuseScore {
     id: plugin
-    version: "1.6.1"
+    version: "1.7.0"
     title: "ViolinFingering"
     description: "Violin fingering (string/finger/position) by dynamic programming. Reads key signature; writes finger numbers and Roman-numeral position marks."
     pluginType: "dialog"
@@ -102,6 +102,9 @@ MuseScore {
     // Every instrument in Core.INSTRUMENTS gets a radio button; the ones
     // flagged experimental are marked in red when selected.
     readonly property var instrumentNames: Object.keys(Core.INSTRUMENTS)
+
+    // String-number mode: Core.STRING_MARKS_OFF / _ALWAYS / _CHANGE
+    property int stringMarks: Core.STRING_MARKS_OFF
 
     function detectPartInstrument(partIndex) {
         try {
@@ -264,8 +267,10 @@ MuseScore {
             endTick = c2.tick === 0 ? curScore.lastSegment.tick + 1 : c2.tick;
         }
         targetStaff = staffIdx;
+        buildMeasureStarts();
         var byTick = {};
         var keyByTick = {};
+        var measureByTick = {};
         registry = loadRegistry();
         pluginEls = [];
         promotedEls = [];
@@ -294,6 +299,9 @@ MuseScore {
                     if (keyByTick[cursor.tick] === undefined) {
                         try { keyByTick[cursor.tick] = cursor.keySignature; } catch (e0) {}
                     }
+                    // Bar number for diagnostics only: errors name bars, not ticks.
+                    if (measureByTick[cursor.tick] === undefined)
+                        measureByTick[cursor.tick] = measureNoAt(cursor.tick);
                     // Grace chords are real played notes: give each one a
                     // synthetic tick just before (grace-after: just after)
                     // the main note so it takes its place in the fingering
@@ -330,8 +338,10 @@ MuseScore {
             var pitches = Object.keys(byTick[ticks[ti]])
                 .map(function (k) { return byTick[ticks[ti]][k]; })
                 .sort(function (a, b) { return b.midi - a.midi; });
+            var mno = measureByTick[ticks[ti]];
             events.push({tick: ticks[ti], pitches: pitches,
                          key: keyByTick[ticks[ti]],
+                         measure: mno === undefined ? measureNoAt(ticks[ti]) : mno,
                          grace: pitches[0].grace || false});
         }
         return events;
@@ -490,6 +500,48 @@ MuseScore {
         return key;
     }
 
+    // Measure start ticks, ascending, built once per run. Used only to turn
+    // ticks into bar numbers for the status window.
+    property var measureStarts: []
+
+    function buildMeasureStarts() {
+        measureStarts = [];
+        try {
+            for (var m = curScore.firstMeasure; m; m = m.nextMeasure)
+                measureStarts.push(m.firstSegment.tick);
+        } catch (e) {
+            measureStarts = [];
+        }
+    }
+
+    // 1-based bar number containing tick, or 0 when unavailable.
+    function measureNoAt(tick) {
+        var ms = measureStarts;
+        if (!ms || !ms.length) return 0;
+        var lo = 0, hi = ms.length - 1, ans = 0;
+        while (lo <= hi) {
+            var mid = Math.floor((lo + hi) / 2);
+            if (ms[mid] <= tick) { ans = mid; lo = mid + 1; }
+            else hi = mid - 1;
+        }
+        return ans + 1;
+    }
+
+    // Collapses a sorted list of bar numbers into "3-7, 11, 20-24".
+    function formatBarRanges(bars, maxRanges) {
+        if (!bars.length) return "";
+        var out = [], start = bars[0], prev = bars[0];
+        for (var i = 1; i <= bars.length; i++) {
+            var b = bars[i];
+            if (i < bars.length && (b === prev || b === prev + 1)) { prev = b; continue; }
+            out.push(start === prev ? "" + start : start + "-" + prev);
+            if (i < bars.length) { start = b; prev = b; }
+        }
+        if (maxRanges && out.length > maxRanges)
+            return out.slice(0, maxRanges).join(", ") + ", +" + (out.length - maxRanges) + " more";
+        return out.join(", ");
+    }
+
     function noteName(midi) {
         var n = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
         return n[midi % 12] + (Math.floor(midi / 12) - 1);
@@ -560,12 +612,23 @@ MuseScore {
         var markerColor = colorize.checked ? autoColor : stealthColor;
         var newItems = [];
         var nFing = 0, nStr = 0, nPos = 0, nSkip = 0;
+        var unsolvedBars = [];
         var prevPos = -1;
+        var markString = Core.stringMarkEvents(result, stringMarks);
         var cursor = curScore.newCursor();
         cursor.staffIdx = targetStaff; cursor.voice = 0;
         for (var i = 0; i < result.length; i++) {
             var st = result[i];
             if (!st || st.harmonic) { nSkip++; continue; }
+            if (st.unsolved) {
+                // No hand plays this event (colliding voices, a chord
+                // needing more strings than the pitches allow, a note out
+                // of range). Left unannotated and reported; the notes
+                // around it are fingered normally.
+                if (events[i].measure) unsolvedBars.push(events[i].measure);
+                nSkip++;
+                continue;
+            }
             var combo = st.combo, handPos = st.pos;
             var thumbWritten = false;
             // Write finger and string number for EACH note in the chord
@@ -602,7 +665,7 @@ MuseScore {
                         nFing++;
                     }
                 }
-                if (writeStrings.checked && !hadString) {
+                if (markString[i] && !hadString) {
                     var stringNum = activeInst.strings.tuning.length - s;
                     var sn = newElement(Element.FINGERING);
                     // Real string number = FINGERING with the String Number
@@ -644,7 +707,8 @@ MuseScore {
         items = items.concat(newItems);
         curScore.setMetaTag("violinFingering", JSON.stringify({v: 2, items: items}));
         curScore.endCmd();
-        return {fing: nFing, str: nStr, pos: nPos, skip: nSkip};
+        return {fing: nFing, str: nStr, pos: nPos, skip: nSkip,
+                unsolvedBars: unsolvedBars};
     }
 
     function apply() {
@@ -670,6 +734,9 @@ MuseScore {
         });
         // Split into segments at harmonic events; solve each independently.
         var result = new Array(chordEvents.length);
+        // Event indices in segments the solver could not finger. A failed
+        // segment must never pass silently: it is reported in the status.
+        var failedIdx = [];
         var segStart = 0;
         for (var ei = 0; ei <= chordEvents.length; ei++) {
             var atEnd = (ei === chordEvents.length);
@@ -691,6 +758,9 @@ MuseScore {
                                     result[k] = segResult[ri++];
                                 }
                             }
+                        } else {
+                            for (var kf = segStart; kf < ei; kf++)
+                                if (!chordEvents[kf].isHarmonic) failedIdx.push(kf);
                         }
                     } else {
                         // segment is entirely harmonic
@@ -703,31 +773,71 @@ MuseScore {
                 segStart = ei + 1;
             }
         }
-        var result_orig = result;
-        // Check if anything was solved
-        var hasAnySolved = result.some(function (r) { return r && !r.harmonic; });
-        result = hasAnySolved ? result : null;
-        if (!result) {
-            var bad = [];
-            for (var bi = 0; bi < events.length && bad.length < 10; bi++)
-                for (var bj = 0; bj < events[bi].pitches.length && bad.length < 10; bj++)
-                    if (Core.candidatesForPitch(events[bi].pitches[bj].midi, key, undefined, activeInst).length === 0)
-                        bad.push(noteName(events[bi].pitches[bj].midi) + " at tick " + events[bi].tick);
-            statusBody = "ViolinFingering could not solve this staff (some notes outside "
-                + activeInstrument + " range).\n"
-                + (bad.length ? "Unplayable: " + bad.join(", ") + "\n" : "")
-                + "Report issues at https://github.com/knoguchi/violin-fingering/issues";
+        // Diagnose the failures: which notes had no playable candidate at
+        // all, and which bars the solver gave up on. Reported whether the
+        // run failed entirely or only in places - a partial result that
+        // leaves most of the score blank must say so.
+        var unplayable = [];           // "C7 (bar 38)", deduplicated
+        var seenUnplayable = {};
+        for (var bi = 0; bi < events.length; bi++) {
+            for (var bj = 0; bj < events[bi].pitches.length; bj++) {
+                var midi = events[bi].pitches[bj].midi;
+                if (Core.candidatesForPitch(midi, events[bi].key != null ? events[bi].key : key,
+                                            undefined, activeInst).length !== 0) continue;
+                var lbl = noteName(midi) + (events[bi].measure ? " (bar " + events[bi].measure + ")"
+                                                              : " (tick " + events[bi].tick + ")");
+                if (seenUnplayable[lbl]) continue;
+                seenUnplayable[lbl] = true;
+                unplayable.push(lbl);
+            }
+        }
+        var failedBars = [];
+        for (var fi = 0; fi < failedIdx.length; fi++) {
+            var fm = events[failedIdx[fi]].measure;
+            if (fm) failedBars.push(fm);
+        }
+        failedBars.sort(function (a, b) { return a - b; });
+        var issuesUrl = "https://github.com/knoguchi/violin-fingering/issues";
+        var rangeNote = unplayable.length
+            ? "Out of " + activeInstrument + " range: "
+              + unplayable.slice(0, 10).join(", ")
+              + (unplayable.length > 10 ? ", +" + (unplayable.length - 10) + " more" : "") + "\n"
+            : "";
+
+        var hasAnySolved = result.some(function (r) {
+            return r && !r.harmonic && !r.unsolved;
+        });
+        if (!hasAnySolved) {
+            statusBody = "Nothing was fingered: the solver could not finger this staff.\n"
+                + rangeNote
+                + (failedBars.length ? "Unsolved bars: "
+                    + formatBarRanges(failedBars, 12) + "\n" : "")
+                + "Report issues at " + issuesUrl;
             return;
         }
         var stats = writeAnnotations(events, result, key);
-        var noteCount = 0;
-        for (var ni = 0; ni < events.length; ni++) noteCount += events[ni].pitches.length;
-        statusBody = "Done: " + noteCount + " notes, "
+        var noteCount = 0, solvedNotes = 0;
+        for (var ni = 0; ni < events.length; ni++) {
+            noteCount += events[ni].pitches.length;
+            if (result[ni] && !result[ni].harmonic && !result[ni].unsolved)
+                solvedNotes += events[ni].pitches.length;
+        }
+        // Bars left blank, whether a single event was unplayable or a whole
+        // segment failed.
+        var blankBars = failedBars.concat(stats.unsolvedBars || []);
+        blankBars.sort(function (a, b) { return a - b; });
+        var head = blankBars.length
+            ? "Partly done: " + solvedNotes + " of " + noteCount + " notes fingered, "
+            : "Done: " + noteCount + " notes, ";
+        statusBody = head
             + (key > 0 ? key + (key === 1 ? " sharp" : " sharps")
                : key < 0 ? (-key) + (key === -1 ? " flat" : " flats") : "no accidentals") + "\n"
+            + (blankBars.length ? "Not fingered in bars "
+                + formatBarRanges(blankBars, 12) + "\n" + rangeNote
+                + "Report issues at " + issuesUrl + "\n" : "")
             + (thumbProblem ? "Thumb sign not written: " + thumbProblem + "\n" : "")
             + "Fingers " + stats.fing
-            + (writeStrings.checked ? ", strings " + stats.str : "")
+            + (stringMarks !== Core.STRING_MARKS_OFF ? ", strings " + stats.str : "")
             + (writePositions.checked ? ", positions " + stats.pos : "");
     }
 
@@ -797,11 +907,32 @@ MuseScore {
             ToolTip.text: "Suffix L/H where a finger is lower/higher than the 1-23-4 shape"
         }
         CheckBox { id: writePositions; checked: true;  text: "Positions (I, II, III...)" }
-        CheckBox {
-            id: writeStrings; checked: false
-            text: "String numbers"
-            ToolTip.visible: hovered; ToolTip.delay: 400
-            ToolTip.text: stringKey()
+        RowLayout {
+            Layout.fillWidth: true
+            Text {
+                text: "String numbers:"
+                Layout.alignment: Qt.AlignTop
+                topPadding: 10        // lines up with the first row of radios
+                color: writeFingers.palette.windowText
+                ToolTip.visible: stringsHover.hovered; ToolTip.delay: 400
+                ToolTip.text: stringKey()
+                HoverHandler { id: stringsHover }
+            }
+            ButtonGroup { id: stringMarksGroup }
+            Flow {
+                Layout.fillWidth: true
+                spacing: 4
+                Repeater {
+                    // index order = Core.STRING_MARKS_OFF / _ALWAYS / _CHANGE
+                    model: ["Off", "Always", "When the string changes"]
+                    RadioButton {
+                        ButtonGroup.group: stringMarksGroup
+                        text: modelData
+                        checked: plugin.stringMarks === index
+                        onClicked: plugin.stringMarks = index
+                    }
+                }
+            }
         }
         CheckBox { id: colorize;       checked: true;  text: "Color new marks blue" }
         CheckBox {

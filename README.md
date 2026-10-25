@@ -79,7 +79,10 @@ lower. Cello (a chromatic, semitone-per-finger hand frame) and a
   fingerings too" is checked.
 
 Checkboxes control which kinds of annotation to write (finger numbers,
-positions, string numbers).
+positions). **String numbers** is a row of radio buttons: *Off* (default), *Always*
+(every note), or *When the string changes* (the first note of each run on
+one string, which keeps busy passages less crowded; a chord counts as the
+set of its strings, and a harmonic or unfingered note starts a new run).
 
 **Mark finger placement** (off by default) adds beginner-style placement
 suffixes to the finger numbers: `1L`, `2L`, `3H`, `4L`. The unmarked
@@ -121,6 +124,10 @@ constraints like plain digits.
   before a whole note is priced like a shift mid-run
 - Notes held across other voices (and tied continuations) do not occupy
   their string while later notes are solved
+- Notes at the same tick are solved as one chord, so independent voices
+  on a staff may collide on a string. Such an event cannot be fingered;
+  it is left unannotated and reported in the status line, and the notes
+  around it are fingered normally
 - Unison double stops (two noteheads on the same pitch) are merged into a
   single note
 - Trills and ornament symbols are not seen by the solver (a trilled note

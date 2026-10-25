@@ -127,8 +127,10 @@ test('all-open event carries hand position through (no snap to I)', function () 
     assert.strictEqual(res[2].pos, 3);
 });
 
-test('unplayable input returns null', function () {
-    assert.strictEqual(core.solveChords(melody([40]), 0, 7), null);
+test('unplayable input is marked unsolved, not abandoned', function () {
+    var res = core.solveChords(melody([40]), 0, 7);
+    assert.strictEqual(res.length, 1);
+    assert.strictEqual(res[0].unsolved, true);
 });
 
 test('shift cost does not include stretch or slide taxes', function () {
@@ -190,7 +192,7 @@ test('spelling picks the displaced finger: sharp raised, flat lowered', function
 
 test('viola tuning: the C string exists, violin range check unchanged', function () {
     // C3 is the viola's open C - unplayable on a violin.
-    assert.strictEqual(core.solveChords(melody([48]), 0, 7), null,
+    assert.strictEqual(core.solveChords(melody([48]), 0, 7)[0].unsolved, true,
         'C3 unplayable on violin');
     var res = core.solveChords(melody([48]), 0, 7, "viola");
     assert.strictEqual(res[0].combo[0][STR], 0, 'lowest string');
@@ -658,4 +660,83 @@ test('cello: a string number on a note keeps applying to the notes after it', fu
     ev[8] = {pitches: [{pitch: 55, string: 3}]};                       // G string from the 9th note on
     const moved = core.solveChords(ev, -1, undefined, 'cello');
     assert.strictEqual(moved[8].combo[0][STR], 1);
+});
+
+test('violin: the high repertoire range is playable (Mendelssohn Andante reaches C7)', function () {
+    // maxPosition used to be VII, which put C7/B6 out of range: notes violinists
+    // actually play came back with no candidates at all.
+    assert.ok(core.candidatesForPitch(96, 0, undefined, 'violin').length, 'C7 playable');
+    assert.ok(core.candidatesForPitch(95, 0, undefined, 'violin').length, 'B6 playable');
+    // Raising the cap must not drag ordinary passages up the fingerboard: a
+    // first-position D major run stays low.
+    const low = core.solveChords(melody([62, 64, 66, 67, 69, 71, 73, 74]), 2, undefined, 'violin');
+    assert.ok(low);
+    low.forEach(function (r, i) { assert.ok(r.pos <= 3, 'note ' + i + ' stays low, got ' + r.pos); });
+});
+
+test('one unplayable note does not discard the whole score', function () {
+    // A single out-of-range note used to take every other note down with
+    // it (solveChords returned null for the lot), so a 100-bar part came
+    // back blank. Now only that event is unsolved.
+    const ev = melody([62, 64, 66, 20, 67, 69]);   // 20 = far below the violin
+    assert.strictEqual(core.candidatesForPitch(20, 0, undefined, 'violin').length, 0);
+    const res = core.solveChords(ev, 2, undefined, 'violin');
+    assert.ok(res);
+    assert.strictEqual(res.length, 6);
+    assert.strictEqual(res[3].unsolved, true, 'the impossible note is flagged');
+    [0, 1, 2, 4, 5].forEach(function (i) {
+        assert.ok(res[i] && res[i].combo, 'note ' + i + ' still fingered');
+        assert.ok(!res[i].unsolved);
+    });
+});
+
+test('an impossible string pin only costs that note (golden case 9)', function () {
+    // F4 pinned to the E string cannot be played: the E string starts at
+    // E5. The other eleven notes of the phrase are still fingered.
+    const ps = [61, 61, 60, 62, 65, 63, 65, 67, 66, 67, 64, 65];
+    const ev = ps.map(function (p, i) {
+        return {pitches: [i === 6 ? {pitch: p, string: 1} : {pitch: p}]};
+    });
+    const res = core.solveChords(ev, 2, undefined, 'violin');
+    assert.ok(res);
+    assert.strictEqual(res[6].unsolved, true);
+    assert.strictEqual(res.filter(function (r) { return r.unsolved; }).length, 1);
+    res.forEach(function (r, i) {
+        if (i !== 6) assert.ok(r.combo, 'note ' + i + ' fingered');
+    });
+});
+
+test('an unsolved event breaks the chain without shifting the alignment', function () {
+    // The segmenting loop restructured around unplayable events must keep
+    // results aligned with their input, including a pin on the first event
+    // (which must not open an empty leading segment).
+    const mk = function (xs) {
+        return xs.map(function (x) {
+            return {pitches: [typeof x === 'number' ? {pitch: x} : x]};
+        });
+    };
+    const pinFirst = core.solveChords(mk([{pitch: 62, finger: 1}, 64, 66]), 2, undefined, 'violin');
+    assert.strictEqual(pinFirst.length, 3);
+    assert.strictEqual(pinFirst[0].combo[0][FING], 1, 'pin honored on the first event');
+    // unplayable note between two pins: everything else still lands
+    const mixed = core.solveChords(
+        mk([{pitch: 62, finger: 1}, 20, {pitch: 66, finger: 2}]), 2, undefined, 'violin');
+    assert.strictEqual(mixed.length, 3);
+    assert.strictEqual(mixed[1].unsolved, true);
+    assert.strictEqual(mixed[0].combo[0][FING], 1);
+    assert.strictEqual(mixed[2].combo[0][FING], 2);
+});
+
+test('stringMarkEvents: off / always / when the string changes', function () {
+    function ev(strings) {
+        return {combo: strings.map(function (s) { return [s, 1, 1, 0, 0]; })};
+    }
+    var result = [ev([2]), ev([2]), ev([3]), ev([3]), ev([2, 3]), ev([3, 2]),
+                  ev([3]), {harmonic: true}, ev([3]), {unsolved: true}, ev([3]), null, ev([3])];
+    assert.deepStrictEqual(core.stringMarkEvents(result, core.STRING_MARKS_OFF),
+        result.map(function () { return false; }));
+    assert.deepStrictEqual(core.stringMarkEvents(result, core.STRING_MARKS_ALWAYS),
+        [true, true, true, true, true, true, true, false, true, false, true, false, true]);
+    assert.deepStrictEqual(core.stringMarkEvents(result, core.STRING_MARKS_CHANGE),
+        [true, false, true, false, true, false, true, false, true, false, true, false, true]);
 });
