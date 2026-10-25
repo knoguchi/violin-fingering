@@ -740,3 +740,23 @@ test('stringMarkEvents: off / always / when the string changes', function () {
     assert.deepStrictEqual(core.stringMarkEvents(result, core.STRING_MARKS_CHANGE),
         [true, false, true, false, true, false, true, false, true, false, true, false, true]);
 });
+
+test('positionLabel: cello names positions as cellists do, violin and viola count', function () {
+    // First finger on the A string, per the cellolabstudio.com and
+    // hiyokonote position charts and Suzuki Book 3: Bb half, B 1st, C 2nd,
+    // D 3rd, E 4th, F 5th, G 6th, A 7th; the half step above stays put.
+    var byNote = {Bb: '½', B: 'I', C: 'II', 'C#': 'II', D: 'III', 'D#': 'III',
+                  E: 'IV', F: 'V', 'F#': 'V', G: 'VI', 'G#': 'VI', A: 'VII', 'A#': 'VII'};
+    var notes = ['Bb', 'B', 'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#'];
+    notes.forEach(function (n, pos) {
+        // finger 1 on the A string in this position sounds A3 + 1 + pos
+        assert.strictEqual(core.fingerPitch(3, pos, 1, 0, 'cello'), 57 + 1 + pos, n);
+        assert.strictEqual(core.positionLabel(pos, 'cello'), byNote[n], n);
+    });
+    // thumb territory: no number
+    assert.strictEqual(core.positionLabel(13, 'cello'), '');
+    assert.strictEqual(core.positionLabel(20, 'cello'), '');
+    // violin and viola keep counting in Roman numerals
+    assert.strictEqual(core.positionLabel(3, 'violin'), 'III');
+    assert.strictEqual(core.positionLabel(12, 'viola'), 'XII');
+});

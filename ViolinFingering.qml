@@ -613,7 +613,7 @@ MuseScore {
         var newItems = [];
         var nFing = 0, nStr = 0, nPos = 0, nSkip = 0;
         var unsolvedBars = [];
-        var prevPos = -1;
+        var prevPos = -1, prevLabel = "";
         var markString = Core.stringMarkEvents(result, stringMarks);
         var cursor = curScore.newCursor();
         cursor.staffIdx = targetStaff; cursor.voice = 0;
@@ -688,15 +688,21 @@ MuseScore {
             // position mark once per hand-position change; grace events
             // have synthetic ticks that don't exist as segments, so the
             // mark waits for the main note that carries the position
+            // (the cello gives neighboring positions one name and writes
+            // none in thumb territory: a mark only where the name changes)
             if (writePositions.checked && handPos !== prevPos && !events[i].grace) {
-                cursor.rewindToTick(events[i].tick);
-                var stx = newElement(Element.STAFF_TEXT);
-                stx.text = Core.ROMAN[handPos];
-                stx.color = markerColor;
-                cursor.add(stx);
-                newItems.push([events[i].tick, -1, "p", stx.text, targetStaff]);
+                var plabel = Core.positionLabel(handPos, activeInst);
+                if (plabel && plabel !== prevLabel) {
+                    cursor.rewindToTick(events[i].tick);
+                    var stx = newElement(Element.STAFF_TEXT);
+                    stx.text = plabel;
+                    stx.color = markerColor;
+                    cursor.add(stx);
+                    newItems.push([events[i].tick, -1, "p", stx.text, targetStaff]);
+                    nPos++;
+                }
                 prevPos = handPos;
-                nPos++;
+                prevLabel = plabel;
             }
         }
         // Persist the registry: entries not consumed this run (e.g. outside

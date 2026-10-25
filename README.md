@@ -5,7 +5,9 @@ MuseScore Studio 4.4+.
 
 Computes (string, finger, position) for every note of a violin, viola or
 cello score using position-aware Viterbi dynamic programming, and writes
-finger numbers and Roman-numeral position marks as annotations on the staff.
+finger numbers and position marks as annotations on the staff: Roman
+numerals for violin and viola, the cellist's names for cello (½, I, II ...
+VII, by where the first finger stands; none in thumb position).
 
 For violin and viola the fingering is determined by the key signature: in each
 (string, position) the four fingers play four consecutive scale tones of the

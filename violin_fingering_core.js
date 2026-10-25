@@ -94,6 +94,17 @@ function withDefaults(over) {
     return cost;
 }
 
+// Cello position names, indexed by position (a semitone step), named as
+// cellists do by where the first finger stands. On the A string (C string):
+// Bb (Db) half position, B (D) first, C (Eb) second, D (F) third, E (G)
+// fourth, F (Ab) fifth, G (Bb) sixth, A (C) seventh; the half step above a
+// position's start (C#, D#, F#, G#, A#) is still that position. Sources:
+// the cellolabstudio.com and hiyokonote.official.jp position charts,
+// Suzuki Cello School Book 3 (3rd, 4th, 5th position etudes). Above VII is
+// thumb territory, where cellists write the thumb sign, not a number.
+var CELLO_POSITIONS = ["\u00bd", "I", "II", "II", "III", "III", "IV",
+                       "V", "V", "VI", "VI", "VII", "VII"];
+
 // Cello key map: per key signature and mode (maj / min = melodic minor), the zero-cost
 // (string index, finger) of each scale tone, taken from a cellist's two-octave scale
 // fingerings. Departing from it costs cost.keyMap, the way an accidental costs on the
@@ -288,6 +299,7 @@ var INSTRUMENTS = {
             openOffsets: [0, 2, 3, 4],
             frameAnchor: 2,
             hlEnabled: false,
+            positionLabels: CELLO_POSITIONS,
             minPosition: 0,         // half position: finger 1 a semitone above the open string
             maxPosition: 30,        // E6 with finger 1; the cost of high positions keeps it rare
             // Thumb (finger 5, the thumb-position sign): a fifth hand slot
@@ -375,6 +387,13 @@ function detectInstrument(id) {
 // Position labels, indexed by position. "\u00bd" is ½: half position (cello).
 var ROMAN = ["\u00bd", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X",
              "XI", "XII", "XIII", "XIV", "XV", "XVI", "XVII", "XVIII", "XIX", "XX"];
+
+// Position mark for `pos` on `instrument`, or "" where none is written.
+function positionLabel(pos, instrument) {
+    var labels = resolveInst(instrument).hand.positionLabels;
+    if (!labels) return ROMAN[pos] || "";
+    return labels[pos] || "";
+}
 
 // Scale tones (pitch classes) of a key; key = signature count, + sharps / - flats.
 function keyScale(key) {
@@ -484,7 +503,8 @@ function maxStrings() {
     return m;
 }
 
-// True for a position mark the plugin writes ("\u00bd", "I" ... "XX").
+// True for a position mark the plugin writes ("\u00bd", "I" ... "XX"; the
+// cello names are a subset).
 function isPositionMark(txt) {
     return ROMAN.indexOf(txt) >= 0;
 }
