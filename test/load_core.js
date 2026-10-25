@@ -20,7 +20,7 @@ return {keyScale: keyScale, fingerPitch: fingerPitch,
         stringMarkEvents: stringMarkEvents, STRING_MARKS_OFF: STRING_MARKS_OFF,
         STRING_MARKS_ALWAYS: STRING_MARKS_ALWAYS, STRING_MARKS_CHANGE: STRING_MARKS_CHANGE,
         fingerFromText: fingerFromText, stringFromLabel: stringFromLabel,
-        maxStrings: maxStrings, isPositionMark: isPositionMark,
+        maxStrings: maxStrings, isPositionMark: isPositionMark, positionLabel: positionLabel,
         INSTRUMENTS: INSTRUMENTS, resolveInst: resolveInst,
         detectInstrument: detectInstrument};
 `)();

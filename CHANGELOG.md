@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- Cello position marks use the names cellists use, by where the first
+  finger stands. On the A string: Bb half, B I, C II, D III, E IV, F V,
+  G VI, A VII; the half step above a position's start (C#, D#, F#, G#) is
+  the same position, so a mark is written only where the name changes.
+  Sources: the cellolabstudio.com and hiyokonote.official.jp position
+  charts and Suzuki Cello School Book 3. Before, a cello position was
+  numbered by semitones, so the plugin wrote "VI" for what cellists call
+  fourth position. In thumb position (above VII) no number is written; the
+  thumb sign is. Fingering is unchanged.
+
 ## 1.7.0 (2026-10-24)
 
 - String numbers can be written only where the string changes (#8). The
