@@ -414,6 +414,37 @@ function isThumbArticulation(symbol, subtypeName) {
     return symbol === THUMB_SYMID || subtypeName === THUMB_SUBTYPE_NAME;
 }
 
+// String-number display modes (dialog dropdown order).
+var STRING_MARKS_OFF = 0, STRING_MARKS_ALWAYS = 1, STRING_MARKS_CHANGE = 2;
+
+// Which solved events carry string numbers under `mode`: one boolean per
+// entry of `result` (the solveChords output). In STRING_MARKS_CHANGE an
+// event is marked when its set of strings differs from the previous
+// event's, so a run of notes on one string is marked on its first note
+// only. A chord's set is all its strings: a single note after a double
+// stop is marked even when it shares one of them. A harmonic, unsolved or
+// missing event breaks the run, and the next note is marked again.
+function stringMarkEvents(result, mode) {
+    var out = [], prev = null;
+    for (var i = 0; i < result.length; i++) {
+        var st = result[i];
+        if (!st || st.harmonic || st.unsolved) {
+            out.push(false);
+            prev = null;
+            continue;
+        }
+        if (mode !== STRING_MARKS_CHANGE) {
+            out.push(mode === STRING_MARKS_ALWAYS);
+            continue;
+        }
+        var set = st.combo.map(function (c) { return c[0]; })
+            .sort(function (a, b) { return a - b; }).join(",");
+        out.push(set !== prev);
+        prev = set;
+    }
+    return out;
+}
+
 // Offset of a candidate's finger in its own hand shape (closed or open).
 function shapeOffset(inst, c) {
     return c[7] ? inst.hand.openOffsets[c[1] - 1] : inst.hand.frameOffsets[c[1] - 1];

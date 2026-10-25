@@ -726,3 +726,17 @@ test('an unsolved event breaks the chain without shifting the alignment', functi
     assert.strictEqual(mixed[0].combo[0][FING], 1);
     assert.strictEqual(mixed[2].combo[0][FING], 2);
 });
+
+test('stringMarkEvents: off / always / when the string changes', function () {
+    function ev(strings) {
+        return {combo: strings.map(function (s) { return [s, 1, 1, 0, 0]; })};
+    }
+    var result = [ev([2]), ev([2]), ev([3]), ev([3]), ev([2, 3]), ev([3, 2]),
+                  ev([3]), {harmonic: true}, ev([3]), {unsolved: true}, ev([3]), null, ev([3])];
+    assert.deepStrictEqual(core.stringMarkEvents(result, core.STRING_MARKS_OFF),
+        result.map(function () { return false; }));
+    assert.deepStrictEqual(core.stringMarkEvents(result, core.STRING_MARKS_ALWAYS),
+        [true, true, true, true, true, true, true, false, true, false, true, false, true]);
+    assert.deepStrictEqual(core.stringMarkEvents(result, core.STRING_MARKS_CHANGE),
+        [true, false, true, false, true, false, true, false, true, false, true, false, true]);
+});

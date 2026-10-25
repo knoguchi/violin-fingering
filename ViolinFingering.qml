@@ -103,6 +103,9 @@ MuseScore {
     // flagged experimental are marked in red when selected.
     readonly property var instrumentNames: Object.keys(Core.INSTRUMENTS)
 
+    // String-number mode: Core.STRING_MARKS_OFF / _ALWAYS / _CHANGE
+    property int stringMarks: Core.STRING_MARKS_OFF
+
     function detectPartInstrument(partIndex) {
         try {
             var part = curScore.parts[partIndex];
@@ -611,6 +614,7 @@ MuseScore {
         var nFing = 0, nStr = 0, nPos = 0, nSkip = 0;
         var unsolvedBars = [];
         var prevPos = -1;
+        var markString = Core.stringMarkEvents(result, stringMarks);
         var cursor = curScore.newCursor();
         cursor.staffIdx = targetStaff; cursor.voice = 0;
         for (var i = 0; i < result.length; i++) {
@@ -661,7 +665,7 @@ MuseScore {
                         nFing++;
                     }
                 }
-                if (writeStrings.checked && !hadString) {
+                if (markString[i] && !hadString) {
                     var stringNum = activeInst.strings.tuning.length - s;
                     var sn = newElement(Element.FINGERING);
                     // Real string number = FINGERING with the String Number
@@ -833,7 +837,7 @@ MuseScore {
                 + "Report issues at " + issuesUrl + "\n" : "")
             + (thumbProblem ? "Thumb sign not written: " + thumbProblem + "\n" : "")
             + "Fingers " + stats.fing
-            + (writeStrings.checked ? ", strings " + stats.str : "")
+            + (stringMarks !== Core.STRING_MARKS_OFF ? ", strings " + stats.str : "")
             + (writePositions.checked ? ", positions " + stats.pos : "");
     }
 
@@ -903,11 +907,32 @@ MuseScore {
             ToolTip.text: "Suffix L/H where a finger is lower/higher than the 1-23-4 shape"
         }
         CheckBox { id: writePositions; checked: true;  text: "Positions (I, II, III...)" }
-        CheckBox {
-            id: writeStrings; checked: false
-            text: "String numbers"
-            ToolTip.visible: hovered; ToolTip.delay: 400
-            ToolTip.text: stringKey()
+        RowLayout {
+            Layout.fillWidth: true
+            Text {
+                text: "String numbers:"
+                Layout.alignment: Qt.AlignTop
+                topPadding: 10        // lines up with the first row of radios
+                color: writeFingers.palette.windowText
+                ToolTip.visible: stringsHover.hovered; ToolTip.delay: 400
+                ToolTip.text: stringKey()
+                HoverHandler { id: stringsHover }
+            }
+            ButtonGroup { id: stringMarksGroup }
+            Flow {
+                Layout.fillWidth: true
+                spacing: 4
+                Repeater {
+                    // index order = Core.STRING_MARKS_OFF / _ALWAYS / _CHANGE
+                    model: ["Off", "Always", "When the string changes"]
+                    RadioButton {
+                        ButtonGroup.group: stringMarksGroup
+                        text: modelData
+                        checked: plugin.stringMarks === index
+                        onClicked: plugin.stringMarks = index
+                    }
+                }
+            }
         }
         CheckBox { id: colorize;       checked: true;  text: "Color new marks blue" }
         CheckBox {

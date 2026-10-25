@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- String numbers can be written only where the string changes (#8). The
+  "String numbers" checkbox is now three radio buttons: Off, Always, or When the
+  string changes, which marks the first note of each run on one string and
+  leaves the rest of the run unmarked. A chord counts as the set of its
+  strings; a harmonic or unfingered event ends the run, so the note after
+  it is marked again.
 - An event no hand can play no longer aborts the staff. Previously
   `solveChords` returned null for the whole input, so one impossible event
   (a note out of range, a note pinned to a string that cannot reach it, two

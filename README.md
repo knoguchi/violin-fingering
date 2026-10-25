@@ -79,7 +79,10 @@ lower. Cello (a chromatic, semitone-per-finger hand frame) and a
   fingerings too" is checked.
 
 Checkboxes control which kinds of annotation to write (finger numbers,
-positions, string numbers).
+positions). **String numbers** is a row of radio buttons: *Off* (default), *Always*
+(every note), or *When the string changes* (the first note of each run on
+one string, which keeps busy passages less crowded; a chord counts as the
+set of its strings, and a harmonic or unfingered note starts a new run).
 
 **Mark finger placement** (off by default) adds beginner-style placement
 suffixes to the finger numbers: `1L`, `2L`, `3H`, `4L`. The unmarked
