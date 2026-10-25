@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.7.0 (2026-10-24)
 
 - String numbers can be written only where the string changes (#8). The
   "String numbers" checkbox is now three radio buttons: Off, Always, or When the
